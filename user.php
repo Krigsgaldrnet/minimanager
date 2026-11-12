@@ -14,7 +14,8 @@ valid_login($action_permission['read']);
 function browse_users(&$sqlr, &$sqlc)
 {
     global $output, $lang_global, $lang_user, $mmfpm_db, $action_permission, $user_lvl, $user_name,
-           $itemperpage, $expansion_select, $gm_level_arr;
+           $itemperpage, $expansion_select, $gm_level_arr, $showcountryflag, $characters_db, $realm_id;
+    if ($showcountryflag) { require_once 'libs/misc_lib.php'; }
 
     $online_pq = "online";
 
@@ -44,84 +45,118 @@ function browse_users(&$sqlr, &$sqlc)
     $search_by = '';
     $search_value = '';
 
+    $is_country_sort = ($order_by === 'country');
     $order_by2 = $order_by;
     if ($order_by == 'SecurityLevel')
         $order_by = 'account_access.SecurityLevel';
     elseif ($order_by == 'online')
         $order_by = 'account.online';
+    elseif ($order_by == 'country')
+        $order_by = 'account.last_ip';
     else
     {
         $order_by = 'account.'.$order_by2;
         unset($order_by2);
     }
 
-    // if we have a search request, if not we just return everything
-    if(isset($_GET['search_value']) && isset($_GET['search_by']))
-    {
-        // injection prevention
-        $search_value = $sqlr->quote_smart($_GET['search_value']);
-        $search_by = $sqlr->quote_smart($_GET['search_by']);
-        $search_menu = ['username', 'id', 'SecurityLevel', 'greater_gmlevel', 'email', 'joindate', 'last_ip', 'failed_logins', 'greater_failed_logins', 'lesser_failed_logins', 'last_login', 'online', 'banned', 'locked', 'expansion'];
-        if (in_array($search_by, $search_menu));
-        else
-            $search_by = 'username';
-        unset($search_menu);
+    // Multi-condition search support (AND)
+    $search_values = isset($_GET['search_value']) ? (array)$_GET['search_value'] : [''];
+    $search_bys = isset($_GET['search_by']) ? (array)$_GET['search_by'] : ['username'];
+    $search_menu = ['username', 'id', 'SecurityLevel', 'greater_gmlevel', 'email', 'joindate', 'last_ip', 'country', 'failed_logins', 'greater_failed_logins', 'lesser_failed_logins', 'last_login', 'online', 'banned', 'locked', 'expansion'];
 
-        // special search cases
-        // developer note: 'if else' is always faster then 'switch case'
-        if ($search_by === 'greater_gmlevel')
+    $where_clauses = [];
+    $search_url = '';
+    $active_filters = [];
+
+    for ($idx = 0; $idx < count($search_values); $idx++)
+    {
+        $val_raw = trim((string)$search_values[$idx]);
+        $field = isset($search_bys[$idx]) ? $search_bys[$idx] : 'username';
+        if (!in_array($field, $search_menu))
+            $field = 'username';
+
+        if ($val_raw === '')
+            continue;
+
+        $active_filters[] = ['by' => $field, 'val' => $val_raw];
+        $search_url .= '&amp;search_by%5B%5D=' . urlencode($field) . '&amp;search_value%5B%5D=' . urlencode($val_raw);
+        $val = $sqlr->quote_smart($val_raw);
+
+        if ($field === 'greater_gmlevel')
+            $where_clauses[] = 'account_access.SecurityLevel < ' . intval($val_raw);
+        elseif ($field === 'SecurityLevel')
+            $where_clauses[] = 'account_access.SecurityLevel = ' . intval($val_raw);
+        elseif ($field === 'banned')
         {
-            $sql_query = 'SELECT `account_access`.`SecurityLevel`, `account`.`username`, `account`.`id`, `account`.`expansion`, `account`.`email`, `account`.`joindate`, `account`.`failed_logins`, `account`.`locked`, `account`.`last_login`, `account`.`online`, `account`.`last_ip` FROM account LEFT JOIN account_access ON account.id=account_access.AccountID WHERE account_access.SecurityLevel < '.$search_value.' ORDER BY '.$order_by.' '.$order_dir.' LIMIT '.$start.', '.$itemperpage.'';
-            $query_1 = $sqlr->query('SELECT count(*) FROM account_access WHERE SecurityLevel = "%'.$search_value.'%"');
-        }
-        elseif ($search_by === 'SecurityLevel')
-        {
-            $sql_query = 'SELECT `account_access`.`SecurityLevel`, `account`.`username`, `account`.`id`, `account`.`expansion`, `account`.`email`, `account`.`joindate`, `account`.`failed_logins`, `account`.`locked`, `account`.`last_login`, `account`.`online`, `account`.`last_ip` FROM account LEFT JOIN account_access ON account.id=account_access.AccountID WHERE account_access.SecurityLevel = '.$search_value.' ORDER BY '.$order_by.' '.$order_dir.' LIMIT '.$start.', '.$itemperpage.'';
-            $query_1 = $sqlr->query('SELECT count(*) FROM account_access WHERE SecurityLevel = "%'.$search_value.'%"');
-        }
-        elseif ($search_by === 'banned')
-        {
-            $sql_query = 'SELECT `account_access`.`SecurityLevel`, `account`.`username`, `account`.`id`, `account`.`expansion`, `account`.`email`, `account`.`joindate`, `account`.`failed_logins`, `account`.`locked`, `account`.`last_login`, `account`.`online`, `account`.`last_ip` FROM account LEFT JOIN account_access ON account.id=account_access.AccountID WHERE account.id = 0 ';
-            $count_query = 'SELECT count(*) FROM account WHERE id = 0 ';
+            $b_ids = [0];
             $que = $sqlr->query('SELECT id FROM account_banned');
             while ($banned = $sqlr->fetch_assoc($que))
+                $b_ids[] = intval($banned['id']);
+            if ($val_raw === '0')
+                $where_clauses[] = 'account.id NOT IN (' . implode(',', $b_ids) . ')';
+            else
+                $where_clauses[] = 'account.id IN (' . implode(',', $b_ids) . ')';
+        }
+        elseif ($field === 'failed_logins')
+            $where_clauses[] = 'account.failed_logins = ' . intval($val_raw);
+        elseif ($field === 'greater_failed_logins')
+            $where_clauses[] = 'account.failed_logins > ' . intval($val_raw);
+        elseif ($field === 'lesser_failed_logins')
+            $where_clauses[] = 'account.failed_logins < ' . intval($val_raw);
+        elseif ($field === 'country')
+        {
+            require_once 'libs/misc_lib.php';
+            $matched_ips = [];
+            $q_ips = $sqlr->query("SELECT DISTINCT last_ip FROM account WHERE last_ip != ''");
+            while ($ip_r = $sqlr->fetch_assoc($q_ips))
             {
-                $sql_query .= 'OR id = '.$banned['id'].'';
-                $count_query .= 'OR id = '.$banned['id'].'';
+                $c_info = misc_get_country_by_ip($ip_r['last_ip'], $sqlm);
+                if (!empty($c_info['code']) && (stripos($c_info['country'], $val_raw) !== false || strcasecmp($c_info['code'], $val_raw) === 0))
+                    $matched_ips[] = "'" . $sqlr->quote_smart($ip_r['last_ip']) . "'";
             }
-            $sql_query .= ' ORDER BY '.$order_by.' '.$order_dir.' LIMIT '.$start.', '.$itemperpage.'';
-            $query_1 = $sqlr->query($count_query);
-            unset($count_query);
+            $where_clauses[] = !empty($matched_ips) ? 'account.last_ip IN (' . implode(',', $matched_ips) . ')' : '1=0';
         }
-        elseif ($search_by === 'failed_logins')
+        elseif ($field === 'last_login')
         {
-            $sql_query = 'SELECT `account_access`.`SecurityLevel`, `account`.`username`, `account`.`id`, `account`.`expansion`, `account`.`email`, `account`.`joindate`, `account`.`failed_logins`, `account`.`locked`, `account`.`last_login`, `account`.`online`, `account`.`last_ip` FROM account LEFT JOIN account_access ON account.id=account_access.AccountID WHERE failed_logins = '.$search_value.' ORDER BY '.$order_by.' '.$order_dir.' LIMIT '.$start.', '.$itemperpage.'';
-            $query_1 = $sqlr->query('SELECT count(*) FROM account WHERE failed_logins = '.$search_value.'');
-        }
-        elseif ($search_by === 'greater_failed_logins')
-        {
-            $sql_query = 'SELECT `account_access`.`SecurityLevel`, `account`.`username`, `account`.`id`, `account`.`expansion`, `account`.`email`, `account`.`joindate`, `account`.`failed_logins`, `account`.`locked`, `account`.`last_login`, `account`.`online`, `account`.`last_ip` FROM account LEFT JOIN account_access ON account.id=account_access.AccountID WHERE failed_logins > '.$search_value.' ORDER BY '.$order_by.' '.$order_dir.' LIMIT '.$start.', '.$itemperpage.'';
-            $query_1 = $sqlr->query('SELECT count(*) FROM account WHERE failed_logins > '.$search_value.'');
-        }
-        elseif ($search_by === 'lesser_failed_logins')
-        {
-            $sql_query = 'SELECT `account_access`.`SecurityLevel`, `account`.`username`, `account`.`id`, `account`.`expansion`, `account`.`email`, `account`.`joindate`, `account`.`failed_logins`, `account`.`locked`, `account`.`last_login`, `account`.`online`, `account`.`last_ip` FROM account LEFT JOIN account_access ON account.id=account_access.AccountID WHERE failed_logins < '.$search_value.' ORDER BY '.$order_by.' '.$order_dir.' LIMIT '.$start.', '.$itemperpage.'';
-            $query_1 = $sqlr->query('SELECT count(*) FROM account WHERE failed_logins < '.$search_value.'');
+            if (preg_match('/^([<>=])?\s*(\d{4}-\d{2}-\d{2})$/', $val_raw, $dm))
+            {
+                $op = !empty($dm[1]) ? $dm[1] : '=';
+                $d_str = $sqlr->quote_smart($dm[2]);
+                $where_clauses[] = "DATE(account.last_login) $op '$d_str'";
+            }
+            else
+                $where_clauses[] = '`account`.last_login LIKE "%' . $val . '%"';
         }
         else
-        {
-            // default search case
-            $sql_query = 'SELECT `account_access`.`SecurityLevel`, `account`.`username`, `account`.`id`, `account`.`expansion`, `account`.`email`, `account`.`joindate`, `account`.`failed_logins`, `account`.`locked`, `account`.`last_login`, `account`.`online`, `account`.`last_ip` FROM account LEFT JOIN account_access ON account.id=account_access.AccountID WHERE `account`.'.$search_by.' LIKE "%'.$search_value.'%" ORDER BY '.$order_by.' '.$order_dir.' LIMIT '.$start.', '.$itemperpage.'';
-            $query_1 = $sqlr->query('SELECT count(*) FROM account LEFT JOIN account_access ON account.id=account_access.AccountID WHERE `account`.'.$search_by.' LIKE "%'.$search_value.'%"');
-        }
-        $query = $sqlr->query($sql_query);
+            $where_clauses[] = '`account`.' . $field . ' LIKE "%' . $val . '%"';
     }
-    else
+
+    $has_chars = (isset($_GET['has_chars']) && $_GET['has_chars'] === '1');
+    if ($has_chars)
     {
-        // get total number of items
-        $query_1 = $sqlr->query('SELECT count(*) FROM account');
-        $query = $sqlr->query('SELECT `account_access`.`SecurityLevel`, `account`.* FROM account LEFT JOIN account_access ON account.id=account_access.AccountID ORDER BY '.$order_by.' '.$order_dir.' LIMIT '.$start.', '.$itemperpage.'');
+        $search_url .= '&amp;has_chars=1';
+        if (!isset($sqlc) || !is_object($sqlc))
+        {
+            $r_target = isset($characters_db[$realm_id]) ? $realm_id : array_key_first($characters_db);
+            $sqlc = new SQL;
+            $sqlc->connect($characters_db[$r_target]['addr'], $characters_db[$r_target]['user'], $characters_db[$r_target]['pass'], $characters_db[$r_target]['name']);
+        }
+        $q_ch_accs = $sqlc->query("SELECT DISTINCT account FROM characters WHERE account > 0");
+        $ch_acc_ids = [0];
+        while ($r_ca = $sqlc->fetch_row($q_ch_accs))
+            $ch_acc_ids[] = intval($r_ca[0]);
+        $where_clauses[] = 'account.id IN (' . implode(',', $ch_acc_ids) . ')';
     }
+
+    $has_search = !empty($where_clauses);
+    if (!$has_search)
+        $active_filters[] = ['by' => 'username', 'val' => ''];
+
+    $where_sql = $has_search ? ' WHERE ' . implode(' AND ', $where_clauses) : '';
+    $query_1 = $sqlr->query('SELECT count(*) FROM account LEFT JOIN account_access ON account.id=account_access.AccountID' . $where_sql);
+    $sql_query = 'SELECT `account_access`.`SecurityLevel`, `account`.`username`, `account`.`id`, `account`.`expansion`, `account`.`email`, `account`.`joindate`, `account`.`failed_logins`, `account`.`locked`, `account`.`last_login`, `account`.`online`, `account`.`last_ip` FROM account LEFT JOIN account_access ON account.id=account_access.AccountID' . $where_sql . ' ORDER BY ' . $order_by . ' ' . $order_dir . ' LIMIT ' . $start . ', ' . $itemperpage;
+    $query = $sqlr->query($sql_query);
+
     // this is for multipage support
     $all_record = $sqlr->result($query_1,0);
     unset($query_1);
@@ -148,7 +183,7 @@ function browse_users(&$sqlr, &$sqlc)
     //if($user_lvl >= $action_permission['delete'])
     //              makebutton($lang_user['cleanup'], 'cleanup.php', 130);
     makebutton($lang_global['back'], 'javascript:window.history.back()', 130);
-    if ($search_by && $search_value)
+    if ($has_search)
         makebutton($lang_user['user_list'], 'user.php', 130);
 
     $output .= '
@@ -158,7 +193,7 @@ function browse_users(&$sqlr, &$sqlc)
     // multi page links
     $output .=
                                 $lang_user['tot_acc'].' : '.$all_record.'<br /><br />'.
-                                generate_pagination('user.php?order_by='.$order_by.'&amp;dir='.(($dir) ? 0 : 1).( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'', $all_record, $itemperpage, $start);
+                                generate_pagination('user.php?order_by='.$order_by.'&amp;dir='.(($dir) ? 0 : 1).$search_url.'', $all_record, $itemperpage, $start);
     // this part for search
     $output .= '
                             </td>
@@ -168,26 +203,61 @@ function browse_users(&$sqlr, &$sqlc)
                                 <table class="hidden">
                                     <tr>
                                         <td>
+                                            <script type="text/javascript">
+                                                function addUserFilter() {
+                                                    var container = document.getElementById("user_filters_container");
+                                                    var rows = container.getElementsByClassName("user_filter_row");
+                                                    var clone = rows[0].cloneNode(true);
+                                                    clone.getElementsByTagName("input")[0].value = "";
+                                                    var remBtn = clone.getElementsByClassName("rem_user_filter_btn")[0];
+                                                    if (remBtn) remBtn.style.display = "inline-block";
+                                                    container.appendChild(clone);
+                                                }
+                                                function removeUserFilter(btn) {
+                                                    var container = document.getElementById("user_filters_container");
+                                                    if (container.getElementsByClassName("user_filter_row").length > 1) {
+                                                        btn.parentNode.remove();
+                                                    }
+                                                }
+                                            </script>
                                             <form action="user.php" method="get" name="form">
                                                 <input type="hidden" name="error" value="3" />
-                                                <input type="text" size="24" maxlength="50" name="search_value" value="'.$search_value.'" placeholder="' . $lang_global['search_by'] . '" />
-                                                <select name="search_by" title="Search by">
-                                                    <option value="username"'.($search_by === 'username' ? ' selected="selected"' : '').'>'.$lang_user['by_name'].'</option>
-                                                    <option value="id"'.($search_by === 'id' ? ' selected="selected"' : '').'>'.$lang_user['by_id'].'</option>
-                                                    <option value="SecurityLevel"'.($search_by === 'SecurityLevel' ? ' selected="selected"' : '').'>'.$lang_user['by_gm_level'].'</option>
-                                                    <option value="greater_gmlevel"'.($search_by === 'greater_gmlevel' ? ' selected="selected"' : '').'>'.$lang_user['greater_gm_level'].'</option>
-                                                    <option value="expansion"'.($search_by === 'expansion' ? ' selected="selected"' : '').'>'.$lang_user['by_expansion'].'</option>
-                                                    <option value="email"'.($search_by === 'email' ? ' selected="selected"' : '').'>'.$lang_user['by_email'].'</option>
-                                                    <option value="joindate"'.($search_by === 'joindate' ? ' selected="selected"' : '').'>'.$lang_user['by_join_date'].'</option>
-                                                    <option value="last_ip"'.($search_by === 'last_ip' ? ' selected="selected"' : '').'>'.$lang_user['by_ip'].'</option>
-                                                    <option value="failed_logins"'.($search_by === 'failed_logins' ? ' selected="selected"' : '').'>'.$lang_user['by_failed_loggins'].'</option>
-                                                    <option value="greater_failed_logins"'.($search_by === 'greater_failed_logins' ? ' selected="selected"' : '').'>'.$lang_user['by_greater_failed_loggins'].'</option>
-                                                    <option value="lesser_failed_logins"'.($search_by === 'lesser_failed_logins' ? ' selected="selected"' : '').'>'.$lang_user['by_lesser_failed_loggins'].'</option>
-                                                    <option value="last_login"'.($search_by === 'last_login' ? ' selected="selected"' : '').'>'.$lang_user['by_last_login'].'</option>
-                                                    <option value="online"'.($search_by === 'online' ? ' selected="selected"' : '').'>'.$lang_user['by_online'].'</option>
-                                                    <option value="locked"'.($search_by === 'locked' ? ' selected="selected"' : '').'>'.$lang_user['by_locked'].'</option>
-                                                    <option value="banned"'.($search_by === 'banned' ? ' selected="selected"' : '').'>'.$lang_user['by_banned'].'</option>
-                                                </select>
+                                                <div id="user_filters_container" style="display:inline-block; vertical-align:middle;">';
+    foreach ($active_filters as $f_idx => $flt)
+    {
+        $f_by = $flt['by'];
+        $f_val = htmlspecialchars($flt['val']);
+        $show_rem = ($f_idx > 0) ? 'inline-block' : 'none';
+        $output .= '
+                                                    <div class="user_filter_row" style="margin-bottom:3px;">
+                                                        <input type="text" size="24" maxlength="50" name="search_value[]" value="'.$f_val.'" placeholder="' . $lang_global['search_by'] . '" />
+                                                        <select name="search_by[]" title="Search by">
+                                                            <option value="username"'.($f_by === 'username' ? ' selected="selected"' : '').'>'.$lang_user['by_name'].'</option>
+                                                            <option value="id"'.($f_by === 'id' ? ' selected="selected"' : '').'>'.$lang_user['by_id'].'</option>
+                                                            <option value="SecurityLevel"'.($f_by === 'SecurityLevel' ? ' selected="selected"' : '').'>'.$lang_user['by_gm_level'].'</option>
+                                                            <option value="greater_gmlevel"'.($f_by === 'greater_gmlevel' ? ' selected="selected"' : '').'>'.$lang_user['greater_gm_level'].'</option>
+                                                            <option value="expansion"'.($f_by === 'expansion' ? ' selected="selected"' : '').'>'.$lang_user['by_expansion'].'</option>
+                                                            <option value="email"'.($f_by === 'email' ? ' selected="selected"' : '').'>'.$lang_user['by_email'].'</option>
+                                                            <option value="joindate"'.($f_by === 'joindate' ? ' selected="selected"' : '').'>'.$lang_user['by_join_date'].'</option>
+                                                            <option value="country"'.($f_by === 'country' ? ' selected="selected"' : '').'>por País</option>
+                                                            <option value="last_ip"'.($f_by === 'last_ip' ? ' selected="selected"' : '').'>'.$lang_user['by_ip'].'</option>
+                                                            <option value="failed_logins"'.($f_by === 'failed_logins' ? ' selected="selected"' : '').'>'.$lang_user['by_failed_loggins'].'</option>
+                                                            <option value="greater_failed_logins"'.($f_by === 'greater_failed_logins' ? ' selected="selected"' : '').'>'.$lang_user['by_greater_failed_loggins'].'</option>
+                                                            <option value="lesser_failed_logins"'.($f_by === 'lesser_failed_logins' ? ' selected="selected"' : '').'>'.$lang_user['by_lesser_failed_loggins'].'</option>
+                                                            <option value="last_login"'.($f_by === 'last_login' ? ' selected="selected"' : '').'>'.$lang_user['by_last_login'].' (&lt; = &gt; YYYY-MM-DD)</option>
+                                                            <option value="online"'.($f_by === 'online' ? ' selected="selected"' : '').'>'.$lang_user['by_online'].'</option>
+                                                            <option value="locked"'.($f_by === 'locked' ? ' selected="selected"' : '').'>'.$lang_user['by_locked'].'</option>
+                                                            <option value="banned"'.($f_by === 'banned' ? ' selected="selected"' : '').'>'.$lang_user['by_banned'].'</option>
+                                                        </select>
+                                                        <button type="button" class="rem_user_filter_btn" onclick="removeUserFilter(this)" style="display:'.$show_rem.'; cursor:pointer;" title="Quitar filtro">-</button>
+                                                    </div>';
+    }
+    $output .= '
+                                                </div>
+                                                <div style="display:inline-block; vertical-align:top;">
+                                                    <button type="button" onclick="addUserFilter()" style="cursor:pointer;" title="Añadir otra condición AND">+</button>
+                                                    <label style="margin-left:6px; cursor:pointer;" title="Mostrar solo cuentas con al menos 1 personaje"><input type="checkbox" name="has_chars" value="1"'.($has_chars ? ' checked="checked"' : '').' /> Con personajes</label>
+                                                </div>
                                             </form>
                                         </td>
                                         <td>';
@@ -212,29 +282,43 @@ function browse_users(&$sqlr, &$sqlc)
     if($user_lvl >= $action_permission['insert'])
         $output.= '
                                 <th width="1%">
-                                    <input name="allbox" type="checkbox" value="Check All" onclick="CheckAll(document.form1);" title="' . $lang_global['check_all'] . '" />
+                                    <input name="allbox" type="checkbox" value="Check All" onclick="CheckAll(document.form1);" title="' . ($lang_global['check_all'] ?? 'Seleccionar') . '" />
                                 </th>';
     else
         $output .= '
                                 <th width="1%"></th>';
     $output .='
-                                <th width="1%"><a href="user.php?order_by=id&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='id' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['id'].'</a></th>
-                                <th width="1%"><a href="user.php?order_by=username&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='username' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['username'].'</a></th>
-                                <th width="1%"><a href="user.php?order_by=SecurityLevel&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='SecurityLevel' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['gm_level'].'</a></th>';
+                                <th width="1%"><a href="user.php?order_by=id&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='id' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['id'].'</a></th>
+                                <th width="1%"><a href="user.php?order_by=username&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='username' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['username'].'</a></th>
+                                <th width="1%"><a href="user.php?order_by=SecurityLevel&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='SecurityLevel' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['gm_level'].'</a></th>';
     if ($expansion_select)
         $output .='
-                                <th width="1%"><a href="user.php?order_by=expansion&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='expansion' ? ' class="'.$order_dir.'"' : '').'>EXP</a></th>';
+                                <th width="1%"><a href="user.php?order_by=expansion&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='expansion' ? ' class="'.$order_dir.'"' : '').'>EXP</a></th>';
     $output .='
-                                <th width="1%"><a href="user.php?order_by=email&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='email' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['email'].'</a></th>
-                                <th width="1%"><a href="user.php?order_by=joindate&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='joindate' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['join_date'].'</a></th>
-                                <th width="1%"><a href="user.php?order_by=last_ip&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='last_ip' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['ip'].'</a></th>
-                                <th width="1%"><a href="user.php?order_by=failed_logins&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='failed_logins' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['failed_logins'].'</a></th>
-                                <th width="1%"><a href="user.php?order_by=locked&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='locked' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['locked'].'</a></th>
-                                <th width="1%"><a href="user.php?order_by=last_login&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='last_login' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['last_login'].'</a></th>
-                                <th width="1%"><a href="user.php?order_by=online&amp;start='.$start.( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'&amp;dir='.$dir.'"'.($order_by==='online' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['online'].'</a></th>';
+                                <th width="1%"><a href="user.php?order_by=email&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='email' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['email'].'</a></th>
+                                <th width="1%"><a href="user.php?order_by=joindate&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='joindate' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['join_date'].'</a></th>
+                                <th width="1%"><a href="user.php?order_by=last_ip&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='last_ip' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['ip'].'</a></th>';
+    if ($showcountryflag) $output .= '<th width="1%"><a href="user.php?order_by=country&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($is_country_sort ? ' class="'.$order_dir.'"' : '').'>País</a></th>';
+    $output .= '
+                                <th width="1%"><a href="user.php?order_by=failed_logins&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='failed_logins' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['failed_logins'].'</a></th>
+                                <th width="1%"><a href="user.php?order_by=locked&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='locked' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['locked'].'</a></th>
+                                <th width="1%"><a href="user.php?order_by=last_login&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='last_login' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['last_login'].'</a></th>
+                                <th width="1%"><a href="user.php?order_by=online&amp;start='.$start.$search_url.'&amp;dir='.$dir.'"'.($order_by==='online' ? ' class="'.$order_dir.'"' : '').'>'.$lang_user['online'].'</a></th>';
 
     //---------------Page Specific Data Starts Here--------------------------
-    while ($data = $sqlr->fetch_assoc($query))
+    $rows_data = [];
+    while ($r = $sqlr->fetch_assoc($query)) {
+        if ($showcountryflag) { $r['_country_info'] = misc_get_country_by_ip($r['last_ip'], $sqlm); }
+        $rows_data[] = $r;
+    }
+    if ($is_country_sort && $showcountryflag) {
+        usort($rows_data, function($a, $b) use ($order_dir) {
+            $ca = $a['_country_info']['country'] ?? 'zzz';
+            $cb = $b['_country_info']['country'] ?? 'zzz';
+            return ($order_dir === 'ASC') ? strcmp($ca, $cb) : strcmp($cb, $ca);
+        });
+    }
+    foreach ($rows_data as $data)
     {
         $data['SecurityLevel'] = (!is_null($data['SecurityLevel'])) ? $data['SecurityLevel'] : 0;
         if (($user_lvl >= $data['SecurityLevel'])||($user_name === $data['username']))
@@ -243,7 +327,7 @@ function browse_users(&$sqlr, &$sqlc)
                             <tr>';
             if ($user_lvl >= $action_permission['insert'])
                 $output .= '
-                                <td><input type="checkbox" name="check[]" value="'.$data['id'].'" onclick="CheckCheckAll(document.form1);" title="' . $lang_global['check_all'] . '" /></td>';
+                                <td><input type="checkbox" name="check[]" value="'.$data['id'].'" onclick="CheckCheckAll(document.form1);" title="' . ($lang_global['check_all'] ?? 'Seleccionar') . '" /></td>';
             else
                 $output .= '
                                 <td></td>';
@@ -274,11 +358,29 @@ function browse_users(&$sqlr, &$sqlc)
             else
                 $output .= '
                                 <td>*******</td>';
+            if ($showcountryflag) { $country = $data['_country_info'] ?? misc_get_country_by_ip($data['last_ip'], $sqlm); $output .= '<td>'.(($country['code']) ? '<img src="img/flags/'.$country['code'].'.png" onmousemove="toolTip(\''.addslashes($country['country']).'\', \'item_tooltip\')" onmouseout="toolTip()" alt="" /> '.$country['country'] : '-').'</td>'; }
             $output .= '
                                 <td>'.(($data['failed_logins']) ? $data['failed_logins'] : '-').'</td>
                                 <td>'.(($data['locked']) ? $lang_global['yes_low'] : '-').'</td>
                                 <td class="small">'.$data['last_login'].'</td>
-                                <td>'.(($data['online']) ? '<img src="img/up.gif" alt="" />' : '-').'</td>';
+                                <td>';
+            if ($data['online'])
+            {
+                if (!isset($sqlc) || !is_object($sqlc)) { $sqlc = new SQL; }
+                $r_target = isset($characters_db[$realm_id]) ? $realm_id : array_key_first($characters_db);
+                $sqlc->connect($characters_db[$r_target]['addr'], $characters_db[$r_target]['user'], $characters_db[$r_target]['pass'], $characters_db[$r_target]['name']);
+                $char_on_q = $sqlc->query("SELECT guid, BINARY name AS name FROM `characters` WHERE account = {$data['id']} AND online = 1 LIMIT 1");
+                if ($sqlc->num_rows($char_on_q))
+                {
+                    $char_on = $sqlc->fetch_assoc($char_on_q);
+                    $output .= '<img src="img/up.gif" alt="" /> <a href="char.php?id='.$char_on['guid'].'">'.$char_on['name'].'</a>';
+                }
+                else
+                    $output .= '<img src="img/up.gif" alt="" />';
+            }
+            else
+                $output .= '-';
+            $output .= '</td>';
 
             $output .= '
                             </tr>';
@@ -289,9 +391,8 @@ function browse_users(&$sqlr, &$sqlc)
                             <tr>
                                 <td>*</td><td>***</td><td>You</td><td>Have</td><td>No</td>
                                 <td class=\"small\">Permission</td><td>to</td><td>View</td><td>this</td><td>Data</td><td>***</td>';
-            if ($expansion_select)
-                $output .= '
-                                <td>*</td>';
+            if ($expansion_select) $output .= '<td>*</td>';
+            if ($showcountryflag) $output .= '<td>*</td>';
             $output .= '
                             </tr>';
         }
@@ -302,15 +403,15 @@ function browse_users(&$sqlr, &$sqlc)
     if ($expansion_select)
     {
         if ($expansion_select)
-            $output .= '13';
+            $output .= '14';
         else
-        $output .= '12';
+        $output .= '13';
     }
     else
-        $output .= '11';
+        $output .= '12';
 
     $output .= '" class="hidden" align="right" width="25%">';
-    $output .= generate_pagination('user.php?order_by='.$order_by.'&amp;dir='.(($dir) ? 0 : 1).( $search_value && $search_by ? '&amp;search_by='.$search_by.'&amp;search_value='.$search_value.'' : '' ).'', $all_record, $itemperpage, $start);
+    $output .= generate_pagination('user.php?order_by='.$order_by.'&amp;dir='.(($dir) ? 0 : 1).$search_url.'', $all_record, $itemperpage, $start);
     $output .= '
                                 </td>
                             </tr>
@@ -328,12 +429,12 @@ function browse_users(&$sqlr, &$sqlc)
     if ($expansion_select)
     {
         if ($expansion_select)
-            $output .= '5';
+            $output .= '6';
         else
-            $output .= '4';
+            $output .= '5';
     }
     else
-        $output .= '3';
+        $output .= '4';
     $output .= '" align="right" class="hidden">'.$lang_user['tot_acc'].' : '.$all_record.'</td>
                             </tr>
                         </table>
@@ -779,7 +880,8 @@ function edit_user()
     $sqlm = new SQL;
     $sqlm->connect($mmfpm_db['addr'], $mmfpm_db['user'], $mmfpm_db['pass'], $mmfpm_db['name']);
     $sqlc = new SQL;
-    $sqlc->connect($characters_db[$realm_id]['addr'], $characters_db[$realm_id]['user'], $characters_db[$realm_id]['pass'], $characters_db[$realm_id]['name']);
+    $r_target = isset($characters_db[$realm_id]) ? $realm_id : array_key_first($characters_db);
+                $sqlc->connect($characters_db[$r_target]['addr'], $characters_db[$r_target]['user'], $characters_db[$r_target]['pass'], $characters_db[$r_target]['name']);
 
     $id = $sqlr->quote_smart($_GET['id']);
 
@@ -903,7 +1005,7 @@ function edit_user()
 
                                              if ($showcountryflag)
                                              {
-                                                 $country = misc_get_country_by_ip($data['last_ip'], $sqlm);
+                                                 $country = $data['_country_info'] ?? misc_get_country_by_ip($data['last_ip'], $sqlm);
                                                  $output .= '
                                                             '.(($country['code']) ? '<img src="img/flags/'.$country['code'].'.png" onmousemove="toolTip(\''.($country['country']).'\', \'item_tooltip\')" onmouseout="toolTip()" alt="" />' : '-').'';
                                              }
@@ -915,7 +1017,7 @@ function edit_user()
                                         <td>***.***.***.***";
                                             if ($showcountryflag)
                                             {
-                                                $country = misc_get_country_by_ip($data['last_ip'], $sqlm);
+                                                $country = $data['_country_info'] ?? misc_get_country_by_ip($data['last_ip'], $sqlm);
                                                 $output .= '
                                                            '.(($country['code']) ? '<img src="img/flags/'.$country['code'].'.png" onmousemove="toolTip(\''.($country['country']).'\', \'item_tooltip\')" onmouseout="toolTip()" alt="" />' : '-').'';
                                             }
@@ -1014,7 +1116,21 @@ function edit_user()
                                         <tr>
                                             <td>'.$lang_user['online'].'</td>';
         $output .= "
-                                            <td>".(( $data['online'] ) ? $lang_global['yes'] : $lang_global['no'])."</td>
+                                            <td>";
+        if ($data['online'])
+        {
+            $char_on_edit = $sqlc->query("SELECT guid, BINARY name AS name FROM `characters` WHERE account = {$data['id']} AND online = 1 LIMIT 1");
+            if ($char_on_edit && $sqlc->num_rows($char_on_edit))
+            {
+                $c_on = $sqlc->fetch_assoc($char_on_edit);
+                $output .= $lang_global['yes']." (<a href=\"char.php?id={$c_on['guid']}\">{$c_on['name']}</a>)";
+            }
+            else
+                $output .= $lang_global['yes'];
+        }
+        else
+            $output .= $lang_global['no'];
+        $output .= "</td>
                                         </tr>";
         $query = $sqlr->query("SELECT SUM(numchars) FROM realmcharacters WHERE acctid = '$id'");
         $tot_chars = $sqlr->result($query, 0);
@@ -1041,15 +1157,15 @@ function edit_user()
                                         </tr>";
                 if ($chars_on_realm)
                 {
-                    $char_array = $sqlc->query("SELECT guid, BINARY name AS name, race, class, level, gender FROM `characters` WHERE account = $id");
+                    $char_array = $sqlc->query("SELECT c.guid, BINARY c.name AS name, c.race, c.class, c.level, c.gender, c.online, g.guildid, BINARY g.name AS guild_name FROM `characters` c LEFT JOIN `guild_member` gm ON c.guid = gm.guid LEFT JOIN `guild` g ON gm.guildid = g.guildid WHERE c.account = $id");
                     while ($char = $sqlc->fetch_array($char_array))
                     {
                         $output .= "
                                         <tr>
-                                            <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;---></td>
+                                            <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".((isset($char[6]) && $char[6]) ? "<span style=\"color:#00ff00;font-weight:bold;\">---></span> 🟢" : "--->")."</td>
                                             <td>
                                                 <a href=\"char.php?id=$char[0]&amp;realm=$realm[0]\">$char[1]  - <img src='img/c_icons/{$char[2]}-{$char[5]}.gif' onmousemove='toolTip(\"".char_get_race_name($char[2])."\",\"item_tooltip\")' onmouseout='toolTip()' alt=\"\" />
-                                                <img src='img/c_icons/{$char[3]}.gif' onmousemove='toolTip(\"".char_get_class_name($char[3])."\",\"item_tooltip\")' onmouseout='toolTip()' alt=\"\"/> - lvl ".char_get_level_color($char[4])."</a>";
+                                                <img src='img/c_icons/{$char[3]}.gif' onmousemove='toolTip(\"".char_get_class_name($char[3])."\",\"item_tooltip\")' onmouseout='toolTip()' alt=\"\"/> - lvl ".char_get_level_color($char[4])."</a>".(!empty($char[8]) ? " - &lt;<a href=\"guild.php?action=view_guild&amp;error=3&amp;id={$char[7]}\">{$char[8]}</a>&gt;" : "");
                     if ($enable_soap == 1)
                     {
                         $output .= "            <br /> <br />
@@ -1075,15 +1191,15 @@ function edit_user()
                                         </tr>";
             if ($chars_on_realm)
             {
-                $char_array = $sqlc->query("SELECT guid,BINARY name AS name,race,class, level, gender FROM `characters` WHERE account = $id");
+                $char_array = $sqlc->query("SELECT c.guid, BINARY c.name AS name, c.race, c.class, c.level, c.gender, c.online, g.guildid, BINARY g.name AS guild_name FROM `characters` c LEFT JOIN `guild_member` gm ON c.guid = gm.guid LEFT JOIN `guild` g ON gm.guildid = g.guildid WHERE c.account = $id");
                 while ($char = $sqlc->fetch_array($char_array))
                 {
                     $output .= "
                                         <tr>
-                                            <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;---></td>
+                                            <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".((isset($char[6]) && $char[6]) ? "<span style=\"color:#00ff00;font-weight:bold;\">---></span> 🟢" : "--->")."</td>
                                             <td>
                                                 <a href=\"char.php?id=$char[0]\">$char[1]  - <img src='img/c_icons/{$char[2]}-{$char[5]}.gif' onmousemove='toolTip(\"".char_get_race_name($char[2])."\",\"item_tooltip\")' onmouseout='toolTip()' alt=\"\" />
-                                                <img src='img/c_icons/{$char[3]}.gif' onmousemove='toolTip(\"".char_get_class_name($char[3])."\",\"item_tooltip\")' onmouseout='toolTip()' alt=\"\"/> - lvl ".char_get_level_color($char[4])."</a>";
+                                                <img src='img/c_icons/{$char[3]}.gif' onmousemove='toolTip(\"".char_get_class_name($char[3])."\",\"item_tooltip\")' onmouseout='toolTip()' alt=\"\"/> - lvl ".char_get_level_color($char[4])."</a>".(!empty($char[8]) ? " - &lt;<a href=\"guild.php?action=view_guild&amp;error=3&amp;id={$char[7]}\">{$char[8]}</a>&gt;" : "");
                     if ($enable_soap == 1)
                     {
                         $output .= "            <br /> <br />
@@ -1217,7 +1333,8 @@ function doupdate_referral($referredby, $user_id)
     $sqlm = new SQL;
     $sqlm->connect($mmfpm_db['addr'], $mmfpm_db['user'], $mmfpm_db['pass'], $mmfpm_db['name']);
     $sqlc = new SQL;
-    $sqlc->connect($characters_db[$realm_id]['addr'], $characters_db[$realm_id]['user'], $characters_db[$realm_id]['pass'], $characters_db[$realm_id]['name']);
+    $r_target = isset($characters_db[$realm_id]) ? $realm_id : array_key_first($characters_db);
+                $sqlc->connect($characters_db[$r_target]['addr'], $characters_db[$r_target]['user'], $characters_db[$r_target]['pass'], $characters_db[$r_target]['name']);
     $sqlr = new SQL;
     $sqlr->connect($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name']);
 
