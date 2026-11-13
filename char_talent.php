@@ -1,6 +1,23 @@
 <?php
-
-
+function talent_tab_es($name)
+{
+    $is_es = ((isset($_COOKIE["lang"]) && $_COOKIE["lang"] === "spanish") || (isset($GLOBALS["language"]) && $GLOBALS["language"] === "spanish"));
+    if (!$is_es) return $name;
+    $map = array(
+        "Arms" => "Armas", "Fury" => "Furia", "Protection" => "Protección",
+        "Holy" => "Sagrado", "Retribution" => "Reprensión",
+        "Beast Mastery" => "Bestias", "Marksmanship" => "Puntería", "Survival" => "Supervivencia",
+        "Assassination" => "Asesinato", "Combat" => "Combate", "Subtlety" => "Sutileza",
+        "Discipline" => "Disciplina", "Shadow" => "Sombra",
+        "Blood" => "Sangre", "Frost" => "Escarcha", "Unholy" => "Profano",
+        "Elemental" => "Elemental", "Enhancement" => "Mejora", "Restoration" => "Restauración",
+        "Arcane" => "Arcano", "Fire" => "Fuego",
+        "Affliction" => "Aflicción", "Demonology" => "Demonología", "Destruction" => "Destrucción",
+        "Balance" => "Equilibrio", "Feral Combat" => "Combate feral",
+        "Ferocity" => "Ferocidad", "Tenacity" => "Tenacidad", "Cunning" => "Astucia"
+    );
+    return isset($map[$name]) ? $map[$name] : $name;
+}
 // page header, and any additional required libraries
 require_once 'header.php';
 require_once 'libs/char_lib.php';
@@ -21,7 +38,7 @@ function char_talent(&$sqlr, &$sqlc)
 
     require_once 'core/char/char_security.php';
 
-    $result = $sqlc->query('SELECT account, BINARY name AS name, race, class, level, gender, (SELECT count(spell) FROM character_talent WHERE guid = '.$id.' AND talentGroup = (SELECT activeTalentGroup FROM characters WHERE guid = '.$id.')) AS talent_points
+    $result = $sqlc->query('SELECT account, BINARY name AS name, race, class, level, gender, activeTalentGroup, talentGroupsCount, (SELECT count(spell) FROM character_talent WHERE guid = '.$id.' AND talentGroup = activeTalentGroup) AS talent_points
         FROM characters WHERE guid = '.$id.' LIMIT 1');
 
     if ($sqlc->num_rows($result))
@@ -35,9 +52,13 @@ function char_talent(&$sqlr, &$sqlc)
         if (empty($owner_gmlvl))
             $owner_gmlvl = 0;
 
+$active_spec = isset($char['activeTalentGroup']) ? intval($char['activeTalentGroup']) : 0;
+        $spec_count  = isset($char['talentGroupsCount']) ? intval($char['talentGroupsCount']) : 1;
+        $view_spec   = (isset($_GET['spec']) && in_array(intval($_GET['spec']), array(0, 1), true)) ? intval($_GET['spec']) : $active_spec;
+
         if (($user_lvl > $owner_gmlvl)||($owner_name === $user_name))
         {
-            $result = $sqlc->query('SELECT spell FROM character_spell WHERE guid = '.$id.' and active = 1 and disabled = 0 ORDER BY spell DESC');
+            $result = $sqlc->query('SELECT spell FROM character_talent WHERE guid = '.$id.' AND talentGroup = '.$view_spec.' ORDER BY spell DESC');
 
             $output .= '
                     <style type="text/css">
@@ -55,6 +76,20 @@ function char_talent(&$sqlr, &$sqlc)
                                 <br />';
 
             require_once 'core/char/char_header.php';
+
+            if ($spec_count > 1 || $view_spec === 1) {
+                $is_es = ((isset($_COOKIE["lang"]) && $_COOKIE["lang"] === "spanish") || (isset($GLOBALS["language"]) && $GLOBALS["language"] === "spanish"));
+                $sp_w = $is_es ? "Especialización" : "Spec";
+                $ac_w = $is_es ? " (Activa)" : " (Active)";
+                $s1_lbl = ($view_spec === 0 ? "[$sp_w 1]" : "$sp_w 1") . ($active_spec === 0 ? $ac_w : "");
+                $s2_lbl = ($view_spec === 1 ? "[$sp_w 2]" : "$sp_w 2") . ($active_spec === 1 ? $ac_w : "");
+                $output .= '
+                        <br /><table class="hidden" style="margin: 0 auto;"><tr><td>';
+                makebutton($s1_lbl, 'char_talent.php?id='.$id.'&amp;realm='.$realmid.'&amp;spec=0', 130);
+                $output .= '</td><td>';
+                makebutton($s2_lbl, 'char_talent.php?id='.$id.'&amp;realm='.$realmid.'&amp;spec=1', 130);
+                $output .= '</td></tr></table>';
+            }
 
             $output .= '
                                 <br /><br />
@@ -168,7 +203,14 @@ function char_talent(&$sqlr, &$sqlc)
                     unset($result_all);
                 }
 
-                ksort($tabs_temp); 
+                $talent_points_used = 0;
+            foreach ($tabs_temp as $t_item) {
+                $talent_points_used += intval($t_item['rank']);
+            }
+            $l = $talent_points_used;
+            $talent_points_left = max(0, $talent_points - $talent_points_used);
+
+            ksort($tabs_temp); 
                 foreach ($tabs_temp as $key => $data) {
                     list($field_1, $field_2, $field_3) = explode('_', $key);
                     $tabs[(int)$field_1][(int)$field_2][(int)$field_3] = [$data['spell'], $data['rank'], $data['color']];
@@ -225,7 +267,7 @@ function char_talent(&$sqlr, &$sqlc)
                                                 </tr>
                                                 <tr>
                                                     <td colspan="6" valign="bottom" align="left">
-                                                    '.$sqlm->result($sqlm->query('SELECT field_1 FROM dbc_talenttab WHERE id = '.$k.''), 0, 'field_1').': '.$points.'
+                                                    '.talent_tab_es($sqlm->result($sqlm->query('SELECT field_1 FROM dbc_talenttab WHERE id = '.$k.''), 0, 'field_1')).': '.$points.'
                                                     </td>
                                                 </tr>
                                             </table>
@@ -263,27 +305,74 @@ function char_talent(&$sqlr, &$sqlc)
                 unset($talent_points_used);
                 unset($talent_points_left);
 
-                $result = $sqlc->query('SELECT * FROM character_glyphs WHERE guid = '.$id.' AND talentGroup = (SELECT activeTalentGroup FROM characters WHERE guid = '.$id.')');
-                if ($sqlc->num_rows($result))
+                $result = $sqlc->query('SELECT * FROM character_glyphs WHERE guid = '.$id.' AND talentGroup = '.$view_spec);
+            $major_glyphs = array();
+            $minor_glyphs = array();
+            if ($sqlc->num_rows($result))
+            {
+                $glyphs_row = $sqlc->fetch_assoc($result);
+                $slots = array(
+                    'glyph1' => 0,
+                    'glyph4' => 0,
+                    'glyph6' => 0,
+                    'glyph2' => 1,
+                    'glyph3' => 1,
+                    'glyph5' => 1
+                );
+                foreach ($slots as $col => $gtype)
                 {
-                    $glyphs = $sqlc->fetch_assoc($result);
-                    $glyphs = [$glyphs['glyph1'], $glyphs['glyph2'], $glyphs['glyph3'], $glyphs['glyph4'], $glyphs['glyph5'], $glyphs['glyph6']]; // didnt want to recode the block down there
+                    $gid = isset($glyphs_row[$col]) ? intval($glyphs_row[$col]) : 0;
+                    if ($gid > 0)
+                    {
+                        $g_spell = intval($sqlm->result($sqlm->query('SELECT IFNULL(field_1, 0) FROM dbc_glyphproperties WHERE id = '.$gid.' LIMIT 1'), 0));
+                        if ($g_spell > 0)
+                        {
+                            $g_name = 'Glyph #'.$gid;
+                            $sq = $sqlm->query('SELECT field_136 FROM dbc_spell WHERE id = '.$g_spell.' LIMIT 1');
+                            if ($sq && $sqlm->num_rows($sq))
+                            {
+                                $sn = $sqlm->result($sq, 0, 'field_136');
+                                if (!empty($sn)) $g_name = $sn;
+                            }
+                            if ($gtype === 1)
+                                $minor_glyphs[] = array($g_spell, $g_name);
+                            else
+                                $major_glyphs[] = array($g_spell, $g_name);
+                        }
+                    }
                 }
-                else
-                    $glyphs = [0,0,0,0,0,0,0];
+            }
+            $cls_slug = strtolower(str_replace(' ', '', (string)char_get_class_name($char['class'])));
+            $maj_ico  = file_exists('img/icons/inv_glyph_major'.$cls_slug.'.jpg') ? 'img/icons/inv_glyph_major'.$cls_slug.'.jpg' : 'img/icons/inv_inscription_majorglyph01.jpg';
+            $min_ico  = file_exists('img/icons/inv_glyph_minor'.$cls_slug.'.jpg') ? 'img/icons/inv_glyph_minor'.$cls_slug.'.jpg' : 'img/icons/inv_inscription_minorglyph01.jpg';
 
-                for($i=0;$i<6;++$i)
+            $output .= '<div style="text-align:left;"><b>'.$lang_global['major_glyphs'].':</b><br />';
+            if (!empty($major_glyphs))
+            {
+                foreach ($major_glyphs as $mg)
                 {
-                  if ($glyphs[$i] && $glyphs[$i] > 0)
-                  {
-                    $glyph = $sqlm->result($sqlm->query('select IFNULL(field_1,0) from dbc_glyphproperties where id = '.$glyphs[$i].''), 0);
-                    $output .='
-                                            <a href="'.$spell_datasite.$glyph.'" target="_blank">
-                                                <img src="'.spell_get_icon($glyph, $sqlm).'" width="36" height="36" class="icon_border_0" alt="" />
-                                            </a>';
-                  }
+                    list($gs, $gn) = $mg;
+                    $gn_safe = htmlspecialchars($gn, ENT_QUOTES, 'UTF-8');
+                    $output .= '<a href="'.$spell_datasite.$gs.'" target="_blank" title="'.$gn_safe.'"><img src="'.$maj_ico.'" width="36" height="36" class="icon_border_0" alt="'.$gn_safe.'" style="margin-right:4px;" /></a>';
                 }
-                unset($glyphs);
+            }
+            else
+                $output .= '-';
+
+            $output .= '<br /><br /><b>'.$lang_global['minor_glyphs'].':</b><br />';
+            if (!empty($minor_glyphs))
+            {
+                foreach ($minor_glyphs as $ng)
+                {
+                    list($gs, $gn) = $ng;
+                    $gn_safe = htmlspecialchars($gn, ENT_QUOTES, 'UTF-8');
+                    $output .= '<a href="'.$spell_datasite.$gs.'" target="_blank" title="'.$gn_safe.'"><img src="'.$min_ico.'" width="28" height="28" class="icon_border_0" alt="'.$gn_safe.'" style="margin-right:4px;" /></a>';
+                }
+            }
+            else
+                $output .= '-';
+            $output .= '</div>';
+            unset($glyphs);
                 $output .='
                                         </td>';
             }

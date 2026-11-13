@@ -7,6 +7,7 @@ valid_login($action_permission['read']);
 
 function top100($realmid, &$sqlr, &$sqlc)
 {
+    global $lang_global;
     global $output, $lang_top, $realm_db, $characters_db, $server, $itemperpage, $developer_test_mode, $multi_realm_mode;
 
     $realm_id = $realmid;
@@ -101,7 +102,7 @@ function top100($realmid, &$sqlr, &$sqlc)
 
             $output .= '
                                     <form action="top100.php?type='.$type.'" method="post" name="form'.$realm_id.'">
-                                        Number of Realms :
+                                        '.$lang_global['number_of_realms'].' :
                                         <input type="hidden" name="action" value="realms" />
                                         <select name="n_realms">';
             for($i=1;$i<=$tot_realms;++$i)

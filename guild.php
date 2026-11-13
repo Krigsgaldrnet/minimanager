@@ -49,13 +49,17 @@ function browse_guilds(&$sqlr, &$sqlc)
     //==========================$_GET and SECURE end=============================
     //==========================MyGuild==========================================
 
-    $query_myGuild = $sqlc->query("SELECT g.guildid as gid, BINARY g.name, g.leaderguid AS lguid,
-                                    (SELECT BINARY name from characters where guid = lguid), (SELECT race in (2,5,6,8,10) from characters where guid = lguid) as faction,
-                                    (select count(*) from characters where guid in (select guid from guild_member where guildid = lguid) and online = 1) as gonline,
-                                    (select count(*) from guild_member where guildid = gid), SUBSTRING_INDEX(g.MOTD,' ',6), g.createdate,
-                                    (select account from characters where guid = lguid) FROM guild as g
-                                    left outer join guild_member as gm on gm.guildid = g.guildid left outer join characters as c on c.guid = gm.guid
-                                    where c.account = $user_id group by g.guildid order by gid");
+    $query_myGuild = $sqlc->query("SELECT g.guildid AS gid, BINARY g.name, g.leaderguid AS lguid,
+                                    (SELECT BINARY name FROM characters WHERE guid = g.leaderguid),
+                                    (SELECT race IN (2,5,6,8,10) FROM characters WHERE guid = g.leaderguid) AS faction,
+                                    (SELECT COUNT(*) FROM guild_member gm2 INNER JOIN characters c2 ON c2.guid = gm2.guid WHERE gm2.guildid = g.guildid AND c2.online = 1) AS gonline,
+                                    (SELECT COUNT(*) FROM guild_member WHERE guildid = g.guildid),
+                                    SUBSTRING_INDEX(g.MOTD,' ',6), g.createdate,
+                                    (SELECT account FROM characters WHERE guid = g.leaderguid),
+                                    (SELECT GROUP_CONCAT(BINARY c3.name ORDER BY c3.name SEPARATOR ', ') FROM guild_member gm3 INNER JOIN characters c3 ON c3.guid = gm3.guid WHERE gm3.guildid = g.guildid AND c3.account = $user_id) AS my_chars
+                                    FROM guild AS g
+                                    WHERE g.guildid IN (SELECT DISTINCT gm.guildid FROM guild_member gm INNER JOIN characters c ON c.guid = gm.guid WHERE c.account = $user_id)
+                                    ORDER BY g.guildid");
 
     if ($query_myGuild)
     {
@@ -68,12 +72,13 @@ function browse_guilds(&$sqlr, &$sqlc)
                                 <th width="1%">'.$lang_guild['id'].'</th>
                                 <th width="20%">'.$lang_guild['guild_name'].'</th>
                                 <th width="10%">'.$lang_guild['guild_leader'].'</th>
+                                <th width="15%">'.($lang_global['character'] ?? 'Personaje').'</th>
                                 <th width="1%">'.$lang_guild['guild_faction'].'</th>
                                 <th width="10%">'.$lang_guild['tot_m_online'].'</th>
                                 <th width="20%">'.$lang_guild['guild_motd'].'</th>
                                 <th width="20%">'.$lang_guild['create_date'].'</th>
                             </tr>';
-        while ($data = $sqlr->fetch_row($query_myGuild))
+        while ($data = $sqlc->fetch_row($query_myGuild))
         {
             $result = $sqlr->query("SELECT SecurityLevel FROM account_access WHERE AccountID ='$data[9]'");
             $owner_gmlvl = $sqlr->result($result, 0, 'SecurityLevel');
@@ -83,6 +88,7 @@ function browse_guilds(&$sqlr, &$sqlc)
                                 <td><a href=\"guild.php?action=view_guild&amp;error=3&amp;realm=$realmid&amp;id=$data[0]\">$data[1]</a></td>";
             $output .= ($user_lvl < $owner_gmlvl ) ? "<td>".htmlentities($data[3])."</td>" : "<td><a href=\"char.php?id=$data[2]&amp;realm=$realmid\">".htmlentities($data[3])."</a></td>";
             $output .= "
+                                <td>".htmlentities($data[10])."</td>
                                 <td><img src=\"img/".($data[4]==0 ? "alliance" : "horde")."_small.gif\" alt=\"\" /></td>
                                 <td>$data[5]/$data[6]</td>
                                 <td>".htmlentities($data[7])." ...</td>
@@ -222,6 +228,7 @@ function browse_guilds(&$sqlr, &$sqlc)
         $output .= ($user_lvl >= $action_permission['update']) ? "<td><a href=\"guild.php?action=view_guild&amp;realm=$realmid&amp;error=3&amp;id=$data[0]\">".htmlentities($data[1])."</a></td>" : "<td>".htmlentities($data[1])."</td>";
         $output .= ($user_lvl < $owner_gmlvl ) ? "<td>".htmlentities($data[3])."</td>" : "<td><a href=\"char.php?id=$data[2]&amp;realm=$realmid\">".htmlentities($data[3])."</a></td>";
         $output .= "
+                                <td>".htmlentities($data[10])."</td>
                                 <td><img src=\"img/".($data[4]==0 ? "alliance" : "horde")."_small.gif\" alt=\"\" /></td>
                                 <td>$data[5]</td>
                                 <td class=\"small\">".date('o-m-d', $data[6])."</td>
@@ -425,8 +432,8 @@ function view_guild()
                             <ul>
                                 <li id=\"selected\"><a href=\"guild.php?action=view_guild&amp;realm=$realmid&amp;error=3&amp;id=$guild_data[0]\">".$lang_guild['members']."</a></li>
                                 <li><a href=\"guildbank.php?id=$guild_id&amp;realm=$realmid\">".$lang_guild['guildbank']."</a></li>
-                                <li><a href=\"guild.php?action=guild_logs&amp;realm=$realmid&amp;error=3&amp;id=$guild_id\">Guild Logs</a></li>
-                                <li><a href=\"guild.php?action=bank_logs&amp;realm=$realmid&amp;error=3&amp;id=$guild_id\">Bank Logs</a></li>
+                                <li><a href=\"guild.php?action=guild_logs&amp;realm=$realmid&amp;error=3&amp;id=$guild_id\">{$lang_global['guild_logs']}</a></li>
+                                <li><a href=\"guild.php?action=bank_logs&amp;realm=$realmid&amp;error=3&amp;id=$guild_id\">{$lang_global['bank_logs']}</a></li>
                             </ul>
                         </div>
                         <script type=\"text/javascript\">
@@ -500,9 +507,9 @@ function view_guild()
                                                                     <option value=\"race\"".($f_by === 'race' ? ' selected=\"selected\"' : '').">{$lang_guild['race']}</option>
                                                                     <option value=\"class\"".($f_by === 'class' ? ' selected=\"selected\"' : '').">{$lang_guild['class']}</option>
                                                                     <option value=\"level\"".($f_by === 'level' ? ' selected=\"selected\"' : '').">{$lang_guild['level']}</option>
-                                                                    <option value=\"account\"".($f_by === 'account' ? ' selected=\"selected\"' : '').">Cuenta</option>
-                                                                    <option value=\"email\"".($f_by === 'email' ? ' selected=\"selected\"' : '').">Email</option>
-                                                                    <option value=\"gender\"".($f_by === 'gender' ? ' selected=\"selected\"' : '').">Género</option>
+                                                                    <option value=\"account\"".($f_by === 'account' ? ' selected=\"selected\"' : '').">{$lang_global['account']}</option>
+                                                                    <option value=\"email\"".($f_by === 'email' ? ' selected=\"selected\"' : '').">{$lang_global['email']}</option>
+                                                                    <option value=\"gender\"".($f_by === 'gender' ? ' selected=\"selected\"' : '').">{$lang_global['gender']}</option>
                                                                 </select>
                                                                 <button type=\"button\" class=\"rem_filter_btn\" onclick=\"removeGuildFilter(this)\" style=\"display:$show_rem; cursor:pointer;\" title=\"Quitar filtro\">-</button>
                                                             </div>";
@@ -682,8 +689,8 @@ function guild_logs()
                             <ul>
                                 <li><a href=\"guild.php?action=view_guild&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">".$lang_guild['members']."</a></li>
                                 <li><a href=\"guildbank.php?id=$guild_id&amp;realm=$realmid\">".$lang_guild['guildbank']."</a></li>
-                                <li id=\"selected\"><a href=\"guild.php?action=guild_logs&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">Guild Logs</a></li>
-                                <li><a href=\"guild.php?action=bank_logs&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">Bank Logs</a></li>
+                                <li id=\"selected\"><a href=\"guild.php?action=guild_logs&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">{$lang_global['guild_logs']}</a></li>
+                                <li><a href=\"guild.php?action=bank_logs&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">{$lang_global['bank_logs']}</a></li>
                             </ul>
                         </div>
                         <div id=\"tab_content2\">
@@ -706,9 +713,9 @@ function guild_logs()
                                     <td>
                                         <table class=\"lined\" style=\"width: 100%;\">
                                             <tr>
-                                                <th width=\"25%\">Fecha</th>
-                                                <th width=\"35%\">Personaje</th>
-                                                <th width=\"40%\">Acción</th>
+                                                <th width=\"25%\">{$lang_global['date']}</th>
+                                                <th width=\"35%\">{$lang_global['character']}</th>
+                                                <th width=\"40%\">{$lang_global['action']}</th>
                                             </tr>";
 
     $q_logs = $sqlc->query("SELECT g.EventType, g.TimeStamp, g.PlayerGuid1, g.PlayerGuid2,
@@ -742,9 +749,9 @@ function guild_logs()
                 $char_link = "<i>Personaje borrado (GUID: $target_guid)</i>";
 
             if ($ev_type == 2)
-                $action_txt = "<span style=\"color: #00AA00; font-weight: bold;\">Se unió a la hermandad</span>";
+                $action_txt = "<span style=\"color: #00AA00; font-weight: bold;\">{$lang_global['joined_guild']}</span>";
             elseif ($ev_type == 6)
-                $action_txt = "<span style=\"color: #CC0000; font-weight: bold;\">Abandonó la hermandad</span>";
+                $action_txt = "<span style=\"color: #CC0000; font-weight: bold;\">{$lang_global['left_guild']}</span>";
             else
             {
                 $kicker = !empty($name1) ? htmlentities($name1) : "GUID: $guid1";
@@ -762,7 +769,7 @@ function guild_logs()
     else
         $output .= "
                                             <tr>
-                                                <td colspan=\"3\">No hay registros de entradas o salidas.</td>
+                                                <td colspan=\"3\">{$lang_global['no_guild_logs']}</td>
                                             </tr>";
 
     $output .= "
@@ -844,8 +851,8 @@ function bank_logs()
                             <ul>
                                 <li><a href=\"guild.php?action=view_guild&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">".$lang_guild['members']."</a></li>
                                 <li><a href=\"guildbank.php?id=$guild_id&amp;realm=$realmid\">".$lang_guild['guildbank']."</a></li>
-                                <li><a href=\"guild.php?action=guild_logs&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">Guild Logs</a></li>
-                                <li id=\"selected\"><a href=\"guild.php?action=bank_logs&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">Bank Logs</a></li>
+                                <li><a href=\"guild.php?action=guild_logs&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">{$lang_global['guild_logs']}</a></li>
+                                <li id=\"selected\"><a href=\"guild.php?action=bank_logs&amp;realm=$realmid&amp;error=3&amp;id=$g_id\">{$lang_global['bank_logs']}</a></li>
                             </ul>
                         </div>
                         <div id=\"tab_content2\">
@@ -868,11 +875,11 @@ function bank_logs()
                                     <td>
                                         <table class=\"lined\" style=\"width: 100%;\">
                                             <tr>
-                                                <th width=\"18%\">Fecha</th>
-                                                <th width=\"17%\">Personaje</th>
-                                                <th width=\"15%\">Pestaña</th>
-                                                <th width=\"18%\">Acción</th>
-                                                <th width=\"32%\">Objeto / Oro</th>
+                                                <th width=\"18%\">{$lang_global['date']}</th>
+                                                <th width=\"17%\">{$lang_global['character']}</th>
+                                                <th width=\"15%\">{$lang_global['tab']}</th>
+                                                <th width=\"18%\">{$lang_global['action']}</th>
+                                                <th width=\"32%\">{$lang_global['item_gold']}</th>
                                             </tr>";
     $q_logs = $sqlc->query("SELECT b.TabId, b.EventType, b.PlayerGuid, b.ItemOrMoney, b.ItemStackCount, b.DestTabId, b.TimeStamp,
                             BINARY c.name AS cname, c.account AS cacc
@@ -908,17 +915,17 @@ function bank_logs()
             $wh_url = "https://wowhead.com" . $item_entry;
             $item_str = "<a href=\"$wh_url\" target=\"_blank\">$item_label</a>$qty";
 
-            if ($ev_type == 1)      { $action_txt = "<span style=\"color:#00AA00;font-weight:bold;\">Depositó objeto</span>"; $detail_txt = $item_str; }
-            elseif ($ev_type == 2)  { $action_txt = "<span style=\"color:#CC0000;font-weight:bold;\">Retiró objeto</span>";   $detail_txt = $item_str; }
+            if ($ev_type == 1)      { $action_txt = "<span style=\"color:#00AA00;font-weight:bold;\">{$lang_global['deposited_item']}</span>"; $detail_txt = $item_str; }
+            elseif ($ev_type == 2)  { $action_txt = "<span style=\"color:#CC0000;font-weight:bold;\">{$lang_global['withdrew_item']}</span>";   $detail_txt = $item_str; }
             elseif ($ev_type == 3 || $ev_type == 7) {
                 $dest_label = isset($tabs_names[$dest_tab]) ? $tabs_names[$dest_tab] : "Pestaña " . ($dest_tab + 1);
-                $action_txt = "<span style=\"color:#3399FF;font-weight:bold;\">Movió objeto</span>";
+                $action_txt = "<span style=\"color:#3399FF;font-weight:bold;\">{$lang_global['moved_item']}</span>";
                 $detail_txt = "$item_str &rarr; $dest_label";
             }
-            elseif ($ev_type == 4)  { $action_txt = "<span style=\"color:#00AA00;font-weight:bold;\">Depositó oro</span>";   $detail_txt = $gold_str; }
-            elseif ($ev_type == 5)  { $action_txt = "<span style=\"color:#CC0000;font-weight:bold;\">Retiró oro</span>";     $detail_txt = $gold_str; }
-            elseif ($ev_type == 6)  { $action_txt = "<span style=\"color:#FF8800;font-weight:bold;\">Reparación</span>";     $detail_txt = $gold_str; }
-            elseif ($ev_type == 8 || $ev_type == 9) { $action_txt = "<span style=\"color:#AA66CC;font-weight:bold;\">Compró pestaña</span>"; $detail_txt = $gold_str; }
+            elseif ($ev_type == 4)  { $action_txt = "<span style=\"color:#00AA00;font-weight:bold;\">{$lang_global['deposited_gold']}</span>";   $detail_txt = $gold_str; }
+            elseif ($ev_type == 5)  { $action_txt = "<span style=\"color:#CC0000;font-weight:bold;\">{$lang_global['withdrew_gold']}</span>";     $detail_txt = $gold_str; }
+            elseif ($ev_type == 6)  { $action_txt = "<span style=\"color:#FF8800;font-weight:bold;\">{$lang_global['repair']}</span>";     $detail_txt = $gold_str; }
+            elseif ($ev_type == 8 || $ev_type == 9) { $action_txt = "<span style=\"color:#AA66CC;font-weight:bold;\">{$lang_global['bought_tab']}</span>"; $detail_txt = $gold_str; }
             else                    { $action_txt = "Evento ($ev_type)"; $detail_txt = "$item_or_money"; }
 
             $output .= "
@@ -932,7 +939,7 @@ function bank_logs()
         }
     }
     else
-        $output .= "<tr><td colspan=\"5\">No hay registros del banco de la hermandad.</td></tr>";
+        $output .= "<tr><td colspan=\"5\">{$lang_global['no_bank_logs']}</td></tr>";
 
     $output .= "
                                         </table>
@@ -1019,6 +1026,7 @@ function del_guild()
 //#############################################################################
 function rem_char_from_guild(&$sqlr, &$sqlc)
 {
+    global $lang_global;
     global $characters_db, $realm_id, $user_lvl, $user_id, $action_permission;
 
     // this is multi realm support, as of writing still under development

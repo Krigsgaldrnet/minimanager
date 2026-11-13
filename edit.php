@@ -56,7 +56,7 @@ function edit_user(&$sqlr, &$sqlc)
                                 </tr>
                                 <tr>
                                     <td>'.$lang_edit['password'].'</td>
-                                    <td><input type="password" name="pass" size="42" maxlength="40" placeholder="(unchanged)" /></td>
+                                    <td><input type="password" name="pass" size="42" maxlength="40" placeholder="'.$lang_global['unchanged'].'" /></td>
                                 </tr>
                                 <tr>
                                     <td>'.$lang_edit['mail'].'</td>
@@ -379,6 +379,7 @@ function lang_set()
 //###############################################################################################################
 function theme_set()
 {
+    global $lang_global;
     if (empty($_GET['theme']))
         redirect('edit.php?error=1');
     else

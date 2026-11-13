@@ -69,7 +69,7 @@ function show_list()
                 <tr>
                     <th width=\"5%\">{$lang_global['delete_short']}</th>
                     <th width=\"15%\"><a href=\"banned.php?order_by=$key_field&amp;ban_type=$ban_type&amp;dir=$dir\"".($order_by==$key_field ? " class=\"$order_dir\"" : "").">{$lang_banned['ip_acc']}</a></th>".($ban_type === "account_banned" ? "
-                    <th width=\"18%\" style=\"white-space:nowrap;\">Last IP</th>" : "")."
+                    <th width=\"18%\" style=\"white-space:nowrap;\">{$lang_global['last_ip']}</th>" : "")."
                     <th width=\"16%\"><a href=\"banned.php?order_by=bandate&amp;ban_type=$ban_type&amp;dir=$dir\"".($order_by=='bandate' ? " class=\"$order_dir\"" : "").">{$lang_banned['bandate']}</a></th>
                     <th width=\"16%\"><a href=\"banned.php?order_by=unbandate&amp;ban_type=$ban_type&amp;dir=$dir\"".($order_by=='unbandate' ? " class=\"$order_dir\"" : "").">{$lang_banned['unbandate']}</a></th>
                     <th width=\"15%\"><a href=\"banned.php?order_by=bannedby&amp;ban_type=$ban_type&amp;dir=$dir\"".($order_by=='bannedby' ? " class=\"$order_dir\"" : "").">{$lang_banned['bannedby']}</a></th>
@@ -231,6 +231,7 @@ function add_entry()
 //########################################################################################################################
 function do_add_entry()
 {
+    global $lang_global;
     global $realm_db, $user_name, $output, $action_permission, $user_lvl;
     valid_login($action_permission['insert']);
 

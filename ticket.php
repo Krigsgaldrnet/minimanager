@@ -56,7 +56,7 @@ class tickets
 							<tr>";
 		if($user_lvl >= $action_permission['delete'])
 			$output .="
-								<th width=\"3%\"><input name=\"allbox\" type=\"checkbox\" value=\"Check All\" onclick=\"CheckAll(document.form);\" title='Check all' /></th>";
+								<th width=\"3%\"><input name=\"allbox\" type=\"checkbox\" value=\"Check All\" onclick=\"CheckAll(document.form);\" title='{$lang_global['check_all']}' /></th>";
 		if($user_lvl >= $action_permission['update'])
 			$output .="
 								<th width=\"5%\">{$lang_global['edit']}</th>";
@@ -65,8 +65,8 @@ class tickets
 								<th width=\"6%\" style=\"white-space:nowrap;\"><a href=\"ticket.php?order_by=online&amp;start=$start&amp;dir=$dir\">".($order_by=='online' ? "<img src=\"img/arr_".($dir ? "up" : "dw").".gif\" alt=\"\" /> " : "")."Online?</a></th>
 								<th width=\"12%\"><a href=\"ticket.php?order_by=playerGuid&amp;start=$start&amp;dir=$dir\">".($order_by=='playerGuid' ? "<img src=\"img/arr_".($dir ? "up" : "dw").".gif\" alt=\"\" /> " : "")."{$lang_ticket['sender']}</a></th>";
 		$output .="
-								<th width=\"12%\">Account</th>
-                                                                <th width=\"14%\">Last IP</th>
+								<th width=\"12%\">{$lang_global['account']}</th>
+                                                                <th width=\"14%\">{$lang_global['last_ip']}</th>
                                                                 <th width=\"41%\">{$lang_ticket['ticket_text']}</th>
 							</tr>";
 		while ($ticket = $sqlc->fetch_row($query))
@@ -75,7 +75,7 @@ class tickets
 							<tr>";
 			if($user_lvl >= $action_permission['delete'])
 			$output .="
-								<td><input type=\"checkbox\" name=\"check[]\" value=\"$ticket[0]\" onclick=\"CheckCheckAll(document.form);\" title='Check all' /></td>";
+								<td><input type=\"checkbox\" name=\"check[]\" value=\"$ticket[0]\" onclick=\"CheckCheckAll(document.form);\" title='{$lang_global['check_all']}' /></td>";
 			if($user_lvl >= $action_permission['update'])
 				$output .="
 								<td><a href=\"ticket.php?action=edit_ticket&amp;id=$ticket[0]\">{$lang_global['edit']}</a></td>";
@@ -126,8 +126,8 @@ class tickets
 					</form>
 				</center>
 				<ul>
-				<li>'Delete Checked Ticket(s)' option needs .reload gm_ticket to apply changes ingame.</li>
-				<li>After reloading the table, If the deleted ticket was a open one and the sender was online, he/she will still see his/her ticket as pending and will cannot edit it or open a new ticket till reloging.</li>
+				<li>{$lang_global['reload_ticket_del']}</li>
+				<li>{$lang_global['ticket_del_notice']}</li>
 				</ul>";
 	}
 }
@@ -238,7 +238,7 @@ function edit_ticket()
                     <br />
                 </center>
 				<ul>
-					<li>'Update Ticket' option needs .reload gm_ticket to apply changes ingame.</li>
+					<li>{$lang_global['reload_ticket_upd']}</li>
 				</ul>";
     }
     else
@@ -251,6 +251,7 @@ function edit_ticket()
 //########################################################################################################################
 function do_edit_ticket()
 {
+    global $lang_global;
     global $characters_db, $realm_id, $action_permission;
     valid_login($action_permission['update']);
 
