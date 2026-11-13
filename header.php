@@ -9,7 +9,12 @@ $time_start = microtime(true);
 // resuming login session if available, or start new one
 if (ini_get('session.auto_start'));
 else
+{
+    // SameSite keeps the session cookie off cross-site POSTs; JS never needs it
+    ini_set('session.cookie_samesite', 'Lax');
+    ini_set('session.cookie_httponly', '1');
     session_start();
+}
 
 //---------------------Load Default and User Configuration---------------------
 if (file_exists('./scripts/config.php'))
@@ -118,6 +123,39 @@ if ($allow_anony && empty($_SESSION['logged_in']))
 $sqlr = new SQL;
 $sqlr->connect($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name']);
 
+//---------------------Page permissions----------------------------------------
+// resolved for every request, so the err display flag cannot skip it.
+// the first included file is the script PHP actually runs; PHP_SELF can carry path-info.
+$lookup_file = basename(get_included_files()[0]);
+$action_permission = [];
+foreach ($menu_array as $trunk)
+    foreach ($trunk[2] as $branch)
+        if ($branch[0] === $lookup_file)
+            $action_permission = ['read' => $branch[2], 'insert' => $branch[3], 'update' => $branch[4], 'delete' => $branch[5]];
+unset($branch, $trunk, $lookup_file);
+
+//---------------------Logged in user re-check---------------------------------
+// GM level depends on the realm, re-read it when the realm changes.
+// level and ban state are also re-read at most once a minute.
+// runs before the err check below, so valid_login() never sees a stale level.
+if (!empty($_SESSION['logged_in']))
+{
+    $lvl_realm = ( isset($_GET['r_id']) ) ? (int)$_GET['r_id'] : $_SESSION['realm_id'];
+    if (!isset($_SESSION['lvl_realm'], $_SESSION['lvl_time'])
+        || $_SESSION['lvl_realm'] != $lvl_realm || 60 < time() - $_SESSION['lvl_time'])
+    {
+        if (!$sqlr->num_rows($sqlr->query('SELECT id FROM account WHERE id = '.(int)$_SESSION['user_id'].' AND id NOT IN (SELECT id FROM account_banned WHERE active = 1)')))
+        {
+            session_destroy();
+            redirect('login.php');
+        }
+        $_SESSION['user_lvl'] = get_user_lvl($sqlr, $_SESSION['user_id'], $lvl_realm);
+        $_SESSION['lvl_realm'] = $lvl_realm;
+        $_SESSION['lvl_time'] = time();
+    }
+    unset($lvl_realm);
+}
+
 //----Check if a user has login, if Guest mode is enabled, code above will login as Guest
 if (isset($_SESSION['user_lvl']) && isset($_SESSION['uname']) && isset($_SESSION['realm_id']) && empty($_GET['err']))
 {
@@ -130,35 +168,15 @@ if (isset($_SESSION['user_lvl']) && isset($_SESSION['uname']) && isset($_SESSION
     // for MiniManager security system, getting the users' account group name
     $user_lvl_name = id_get_gm_level($user_lvl);
 
-    // get the file name that called this header
-    $array = explode ( '/', $_SERVER['PHP_SELF']);
-    $lookup_file = $array[sizeof($array)-1];
-    unset($array);
-
     //---------------------Top Menu----------------------------------------------
     $output .= '
                     <div id="menuwrapper">
                         <ul id="menubar">';
     $lang_header = lang_header();
-    $action_permission = [];
     foreach ($menu_array as $trunk)
     {
-        // ignore "invisible array" this is for setting security read/write values
-        // for not accessible elements not in the navbar!
-        if ('invisible' === $trunk[1])
-        {
-            foreach ($trunk[2] as $branch)
-            {
-                if($branch[0] === $lookup_file)
-                {
-                    $action_permission['read']   = $branch[2];
-                    $action_permission['insert'] = $branch[3];
-                    $action_permission['update'] = $branch[4];
-                    $action_permission['delete'] = $branch[5];
-                }
-            }
-        }
-        else
+        // skip the "invisible" array, it only sets permissions for pages not in the navbar
+        if ('invisible' !== $trunk[1])
         {
             $output .= '
                             <li><a href="'.$trunk[0].'">'.(isset($lang_header[$trunk[1]]) ? $lang_header[$trunk[1]] : $trunk[1]).'</a>';
@@ -167,16 +185,13 @@ if (isset($_SESSION['user_lvl']) && isset($_SESSION['uname']) && isset($_SESSION
                     <ul>';
             foreach ($trunk[2] as $branch)
             {
-                if($branch[0] === $lookup_file)
-                {
-                    $action_permission['read']   = $branch[2];
-                    $action_permission['insert'] = $branch[3];
-                    $action_permission['update'] = $branch[4];
-                    $action_permission['delete'] = $branch[5];
-                }
                 if ($user_lvl >= $branch[2])
+                    {
+                    list($b_url, $b_lang) = $branch;
+                    $b_target = (strpos($b_url, 'map') !== false) ? ' target="_blank" rel="noopener noreferrer" onclick="window.open(this.href, \'wow_player_map\', \'width=1050,height=750,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,status=no\'); return false;"' : '';
                     $output .= '
-                            <li><a href="'.$branch[0].'">'.(isset($lang_header[$branch[1]]) ? $lang_header[$branch[1]] : $branch[1]).'</a></li>';
+                            <li><a href="'.$b_url.'"'.$b_target.'>'.(isset($lang_header[$b_lang]) ? $lang_header[$b_lang] : $b_lang).'</a></li>';
+                }
             }
             if(isset($trunk[2][0]))
                 $output .= '
@@ -188,7 +203,6 @@ if (isset($_SESSION['user_lvl']) && isset($_SESSION['uname']) && isset($_SESSION
     }
     unset($branch);
     unset($trunk);
-    unset($lookup_file);
     unset($menu_array);
 
     $output .= '
@@ -208,7 +222,7 @@ if (isset($_SESSION['user_lvl']) && isset($_SESSION['uname']) && isset($_SESSION
             {
                 $set = ($realm_id === $realm['id']) ? '>' : '';
                 $output .= '
-                            <li><a href="realm.php?action=set_def_realm&amp;id='.$realm['id'].'&amp;url='.$_SERVER['PHP_SELF'].'">'.htmlentities($set.' '.$realm['name']).'</a></li>';
+                            <li><a href="realm.php?action=set_def_realm&amp;id='.$realm['id'].'&amp;url='.urlencode($_SERVER['SCRIPT_NAME']).'">'.htmlentities($set.' '.$realm['name']).'</a></li>';
             }
         }
         unset($set);

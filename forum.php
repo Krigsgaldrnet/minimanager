@@ -300,33 +300,33 @@ $query .= "0) GROUP BY account);";
                 if($post[7]=="1"){
                   // Annoucement
                   $output .= "{$forum_lang["annoucement"]}
-                  <a href=\"forum.php?action=edit_announce&amp;id={$post[0]}&amp;state=0\"><img src=\"img/forums/down.gif\" border=\"0\" alt=\"{$forum_lang["down"]}\" /></a>";
+                  <a href=\"forum.php?action=edit_announce&amp;id={$post[0]}&amp;state=0&amp;csrf=".csrf_token()."\"><img src=\"img/forums/down.gif\" border=\"0\" alt=\"{$forum_lang["down"]}\" /></a>";
                 }
                 else{
                   // Sticky
                   $output .= "{$forum_lang["sticky"]}
-                  <a href=\"forum.php?action=edit_stick&amp;id={$post[0]}&amp;state=0\"><img src=\"img/forums/down.gif\" border=\"0\" alt=\"{$forum_lang["down"]}\" /></a>
-                  <a href=\"forum.php?action=edit_announce&amp;id={$post[0]}&amp;state=1\"><img src=\"img/forums/up.gif\" border=\"0\" alt=\"{$forum_lang["up"]}\" /></a>";
+                  <a href=\"forum.php?action=edit_stick&amp;id={$post[0]}&amp;state=0&amp;csrf=".csrf_token()."\"><img src=\"img/forums/down.gif\" border=\"0\" alt=\"{$forum_lang["down"]}\" /></a>
+                  <a href=\"forum.php?action=edit_announce&amp;id={$post[0]}&amp;state=1&amp;csrf=".csrf_token()."\"><img src=\"img/forums/up.gif\" border=\"0\" alt=\"{$forum_lang["up"]}\" /></a>";
                 }
               }
               else{
                 if($post[7]=="1"){
                   // Annoucement
                   $output .= "{$forum_lang["annoucement"]}
-                  <a href=\"forum.php?action=edit_announce&amp;id={$post[0]}&amp;state=0\"><img src=\"img/forums/down.gif\" border=\"0\" alt=\"{$forum_lang["down"]}\" /></a>";
+                  <a href=\"forum.php?action=edit_announce&amp;id={$post[0]}&amp;state=0&amp;csrf=".csrf_token()."\"><img src=\"img/forums/down.gif\" border=\"0\" alt=\"{$forum_lang["down"]}\" /></a>";
                 }
                 else{
                   // Normal Topic
                   $output .= "{$forum_lang["normal"]}
-                  <a href=\"forum.php?action=edit_stick&amp;id={$post[0]}&amp;state=1\"><img src=\"img/forums/up.gif\" border=\"0\" alt=\"{$forum_lang["up"]}\" /></a>";
+                  <a href=\"forum.php?action=edit_stick&amp;id={$post[0]}&amp;state=1&amp;csrf=".csrf_token()."\"><img src=\"img/forums/up.gif\" border=\"0\" alt=\"{$forum_lang["up"]}\" /></a>";
 
                 }
               }
 
               if($post[9]=="1")
-                $output .= " <a href=\"forum.php?action=edit_close&amp;id={$post[0]}&amp;state=0\"><img src=\"img/forums/lock.gif\" border=\"0\" alt=\"{$forum_lang["open"]}\" /></a>";
+                $output .= " <a href=\"forum.php?action=edit_close&amp;id={$post[0]}&amp;state=0&amp;csrf=".csrf_token()."\"><img src=\"img/forums/lock.gif\" border=\"0\" alt=\"{$forum_lang["open"]}\" /></a>";
               else
-                $output .= " <a href=\"forum.php?action=edit_close&amp;id={$post[0]}&amp;state=1\"><img src=\"img/forums/unlock.gif\" border=\"0\" alt=\"{$forum_lang["close"]}\" /></a>";
+                $output .= " <a href=\"forum.php?action=edit_close&amp;id={$post[0]}&amp;state=1&amp;csrf=".csrf_token()."\"><img src=\"img/forums/unlock.gif\" border=\"0\" alt=\"{$forum_lang["close"]}\" /></a>";
               $output .= " <a href=\"forum.php?action=move_topic&amp;id={$post[0]}\"><img src=\"img/forums/move.gif\" border=\"0\" alt=\"{$forum_lang["move"]}\" /></a>";
             }
             if(isset($avatars[$post[1]]))
@@ -401,7 +401,7 @@ $query .= "0) GROUP BY account);";
     // Quick reply form
     if((($user_lvl > 0)||!$closed)&&($forum_skeleton[$cat]["level_post"] <= $user_lvl && $forum["level_post"] <= $user_lvl)
     ){
-      $output .= "<form action=\"forum.php?action=do_add_post\" method=\"POST\" name=\"form\">
+      $output .= "<form action=\"forum.php?action=do_add_post\" method=\"POST\" name=\"form\">".csrf_field()."
       <table class=\"top_hidden\">
       <tr>
       <td align=\"left\">";
@@ -482,6 +482,7 @@ $query .= "0) GROUP BY account);";
   // Queries : 2 with id || 2 (+2) with postid
 }
 function forum_do_edit_close(){
+  csrf_check();
   global $forum_lang, $user_lvl, $mmfpm_db;
   $mysql = new SQL;
   $link = $mysql->connect($mmfpm_db['addr'], $mmfpm_db['user'], $mmfpm_db['pass'], $mmfpm_db['name']);
@@ -509,6 +510,7 @@ function forum_do_edit_close(){
   // Queries : 1
 }
 function forum_do_edit_announce(){
+  csrf_check();
   global $forum_lang, $user_lvl, $mmfpm_db;
   $mysql = new SQL;
   $link = $mysql->connect($mmfpm_db['addr'], $mmfpm_db['user'], $mmfpm_db['pass'], $mmfpm_db['name']);
@@ -536,6 +538,7 @@ function forum_do_edit_announce(){
   // Queries : 1
 }
 function forum_do_edit_stick(){
+  csrf_check();
   global $forum_lang, $user_lvl, $mmfpm_db;
   $mysql = new SQL;
   $link = $mysql->connect($mmfpm_db['addr'], $mmfpm_db['user'], $mmfpm_db['pass'], $mmfpm_db['name']);
@@ -606,12 +609,13 @@ function forum_delete_post(){
   else
     $output .= "<tr><td>{$forum_lang["delete_post"]}</td></tr></table><table class=\"hidden\"><tr><td>";
   makebutton($forum_lang["back"], "javascript:window.history.back()", 120);
-  makebutton($forum_lang["confirm"], "forum.php?action=do_delete_post&amp;id={$topic[0]}", 120);
+  makebutton($forum_lang["confirm"], "forum.php?action=do_delete_post&amp;id={$topic[0]}&amp;csrf=".csrf_token(), 120);
   $output .= "</td></tr></table></center>";
   $mysql->close();
   // Queries : 1
 }
 function forum_do_delete_post(){
+  csrf_check();
   global $forum_lang, $forum_skeleton, $maxqueries, $user_lvl, $user_id, $output, $mmfpm_db;
 
   $mysql = new SQL;
@@ -714,7 +718,7 @@ function forum_add_topic(){
 
   $output .= "<div class=\"top\"><h1>{$forum_lang["forums"]}</h1>{$forum_lang["you_are_here"]} : <a href=\"forum.php\">{$forum_lang["forum_index"]}</a> -> <a href=\"forum.php?action=view_forum&amp;id={$id}\">{$forum["name"]}</a> -> {$forum_lang["new_topic"]}</div><center><table class=\"lined\">";
 
-  $output .= "<form action=\"forum.php?action=do_add_topic\" method=\"POST\" name=\"form\"><table class=\"top_hidden\"><tr><td align=\"left\">";
+  $output .= "<form action=\"forum.php?action=do_add_topic\" method=\"POST\" name=\"form\">".csrf_field()."<table class=\"top_hidden\"><tr><td align=\"left\">";
   makebutton("Post", "javascript:do_submit()",100);
   $output .= "</td><td align=\"right\">{$forum_lang["topic_name"]}: <input name=\"name\" SIZE=\"40\"></td></tr>
   <tr><td colspan=\"2\">".bbcode_editor_js()."
@@ -756,6 +760,7 @@ function forum_add_topic(){
   // Queries : 1
 }
 function forum_do_add_topic(){
+  csrf_check();
   global $enablesidecheck, $forum_skeleton, $forum_lang, $user_lvl, $user_name, $user_id, $mmfpm_db, $minfloodtime;
 
   if($enablesidecheck) $side = get_side(); // Better to use it here instead of call it many time in the loop :)
@@ -854,6 +859,7 @@ if($minfloodtime > 0)
   // Queries : 3
 }
 function forum_do_add_post(){
+  csrf_check();
   global $enablesidecheck, $forum_skeleton, $forum_lang, $minfloodtime, $user_lvl, $user_name, $user_id, $mmfpm_db;
 
   if($enablesidecheck) $side = get_side(); // Better to use it here instead of call it many time in the loop :)
@@ -919,7 +925,11 @@ function forum_do_add_post(){
 	  error($forum_lang["no_such_topic"]);
 	  return;
   }
-  else $topic = $mysql->quote_smart($_POST['topic']);
+  else $topic = (int)$_POST['topic'];
+  if($topic < 1){
+	  error($forum_lang["no_such_topic"]);
+	  return;
+  }
 
 //  $_POST['msg'] = htmlspecialchars($_POST['msg']);
   $msg = trim($mysql->quote_smart($_POST['msg']), " ");
@@ -982,7 +992,7 @@ function forum_edit_post(){
   }
   $forum = $forum_skeleton[$cat]["forums"][$post[3]];
 
-  $output .= "<div class=\"top\"><h1>{$forum_lang["forums"]}</h1>{$forum_lang["you_are_here"]} : <a href=\"forum.php\">{$forum_lang["forum_index"]}</a> -> <a href=\"forum.php?action=view_forum&amp;id={$post[3]}\">{$forum["name"]}</a> -> <a href=\"forum.php?action=view_topic&amp;id={$post[1]}\">{$post[4]}</a> -> {$forum_lang["edit"]}</div><form action=\"forum.php?action=do_edit_post\" method=\"POST\" name=\"form\"><center><table class=\"lined\">";
+  $output .= "<div class=\"top\"><h1>{$forum_lang["forums"]}</h1>{$forum_lang["you_are_here"]} : <a href=\"forum.php\">{$forum_lang["forum_index"]}</a> -> <a href=\"forum.php?action=view_forum&amp;id={$post[3]}\">{$forum["name"]}</a> -> <a href=\"forum.php?action=view_topic&amp;id={$post[1]}\">{$post[4]}</a> -> {$forum_lang["edit"]}</div><form action=\"forum.php?action=do_edit_post\" method=\"POST\" name=\"form\">".csrf_field()."<center><table class=\"lined\">";
 
   $output .= "<table class=\"top_hidden\"><tr><td align=\"left\">";
   makebutton("Post", "javascript:do_submit()",220);
@@ -1036,6 +1046,7 @@ function forum_edit_post(){
   // Queries : 1
 }
 function forum_do_edit_post(){
+  csrf_check();
   global $forum_lang, $user_lvl, $user_name, $user_id, $mmfpm_db;
 
   $mysql = new SQL;
@@ -1050,7 +1061,11 @@ function forum_do_edit_post(){
 	  error($forum_lang["no_such_post"]);
 	  return;
   }
-  else $post = $mysql->quote_smart($_POST['post']);
+  else $post = (int)$_POST['post'];
+  if($post < 1){
+	  error($forum_lang["no_such_post"]);
+	  return;
+  }
 
   if(!isset($_POST['name']))
     $topic = 0;
@@ -1082,13 +1097,25 @@ function forum_do_edit_post(){
   $msg = str_replace('\n', '<br />', $msg);
   $msg = str_replace('\r', '<br />', $msg);
 
-  $result = $mysql->query("SELECT topic FROM mm_forum_posts WHERE id = $post;");
+  $result = $mysql->query("SELECT topic, authorid FROM mm_forum_posts WHERE id = $post;");
+  if($mysql->num_rows($result)==0){
+    $mysql->close();
+    error($forum_lang["no_such_post"]);
+    return;
+  }
   $topicid = $mysql->fetch_row($result);
+  // Same rule as forum_edit_post(): author or moderator.
+  if($user_lvl == 0 && $topicid[1] != $user_id){
+    $mysql->close();
+    error($forum_lang["no_access"]);
+    return;
+  }
 
   $mysql->query("UPDATE mm_forum_posts SET text = '$msg' WHERE id = $post;");
 
-  if($topic == 1){
-    $mysql->query("UPDATE mm_forum_posts SET name = '$name' WHERE topic = {$topicid[0]};");
+  // Only a moderator or the author of the topic's first post may rename the topic.
+  if($topic == 1 && ($user_lvl > 0 || $topicid[0] == $post)){
+    $mysql->query("UPDATE mm_forum_posts SET name = '$name' WHERE topic = ".(int)$topicid[0].";");
   }
 
   $result = $mysql->query("SELECT topic FROM mm_forum_posts WHERE id = $post;");
@@ -1134,7 +1161,7 @@ function forum_move_topic(){
   $forum = $forum_skeleton[$cat]["forums"][$fid];
 
   $output .= "<div class=\"top\"><h1>{$forum_lang["forums"]}</h1>{$forum_lang["you_are_here"]} : <a href=\"forum.php\">{$forum_lang["forum_index"]}</a> -> <a href=\"forum.php?action=view_forum&amp;id={$fid}\">{$forum["name"]}</a> -> <a href=\"forum.php?action=view_topic&amp;id={$topic[1]}\">{$topic[4]}</a> -> {$forum_lang["move"]}!</div><center><table class=\"lined\">
-  <tr><td>{$forum_lang["where"]} : <form action=\"forum.php?action=do_move_topic\" method=\"POST\" name=\"form\"><select name=\"forum\">";
+  <tr><td>{$forum_lang["where"]} : <form action=\"forum.php?action=do_move_topic\" method=\"POST\" name=\"form\">".csrf_field()."<select name=\"forum\">";
 
   foreach($forum_skeleton as $category){
     foreach($category["forums"] as $fid_ => $forum){
@@ -1152,7 +1179,16 @@ function forum_move_topic(){
   $mysql->close();
   // Queries : 1
 }
+function forum_can_read($fid){
+  global $forum_skeleton, $user_lvl;
+  foreach($forum_skeleton as $category){
+    if(isset($category["forums"][$fid]))
+      return $category["level_read"] <= $user_lvl && $category["forums"][$fid]["level_read"] <= $user_lvl;
+  }
+  return false;
+}
 function forum_do_move_topic(){
+  csrf_check();
   global $forum_lang, $forum_skeleton, $maxqueries, $user_lvl, $user_id, $output, $mmfpm_db;
 
   $mysql = new SQL;
@@ -1162,14 +1198,32 @@ function forum_do_move_topic(){
 	  error($forum_lang["no_such_forum"]);
 	  return;
   }
-  else $forum = $mysql->quote_smart($_POST['forum']);
+  else $forum = (int)$_POST['forum'];
   if(!isset($_POST['id'])){
 	  error($forum_lang["no_such_topic"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_POST['id']);
+  else $id = (int)$_POST['id'];
 
-  $mysql->query("UPDATE mm_forum_posts SET forum = '$forum' WHERE topic = '$id'"); // update topic' s last post id
+  // Same rule as forum_move_topic(): moderators only.
+  if($user_lvl == 0){
+	  error($forum_lang["no_access"]);
+	  return;
+  }
+
+  $topic = $mysql->query("SELECT forum FROM mm_forum_posts WHERE id = $id AND id = `topic`;");
+  if($mysql->num_rows($topic)==0){
+	  error($forum_lang["no_such_topic"]);
+	  return;
+  }
+  $topic = $mysql->fetch_row($topic);
+  // The moderator must be able to read both the source and the destination forum.
+  if(!forum_can_read($topic[0]) || !forum_can_read($forum)){
+	  error($forum_lang["no_access"]);
+	  return;
+  }
+
+  $mysql->query("UPDATE mm_forum_posts SET forum = $forum WHERE topic = $id"); // update topic' s last post id
   redirect("forum.php?action=view_topic&id=$id");
   // Queries : 1
 }

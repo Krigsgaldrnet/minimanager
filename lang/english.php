@@ -825,6 +825,8 @@ function lang_edit()
     'error_updating' => 'Update action Error! - Non of the fields changed?',
     'del_error' => 'Unexpected Delete Error.',
     'edit_your_acc' => 'Edit Your Account',
+    'current_pass' => 'Current password',
+    'current_pass_wrong' => 'The current password is wrong.',
     'save' => 'Save',
       ];
   return $lang_edit;
@@ -1071,6 +1073,7 @@ function lang_user()
     'nonidentical_passes' => 'You have Entered two nonidentical Passwords.',
     'user_already_exist' => 'Username Already Exist.',
     'username_pass_too_long' => 'Username/Password size must be 4-to-15 characters long!',
+    'rename_needs_pass' => 'A new password is required to change the username.',
     'use_only_eng_charset' => 'Username must contain [A-Z][a-z][0-9] only!',
     'no_value_passed' => 'No Value Passed',
     'edit_acc' => 'Edit Account',

@@ -38,8 +38,20 @@ function valid_login($restrict_lvl)
     else 
         redirect('login.php');
 
-    if ($user_lvl < $restrict_lvl) 
-        redirect('login.php?error=5');
+    // a missing threshold (page not found in $menu_array) must deny, not compare against null
+    if (!is_numeric($restrict_lvl) || $user_lvl < $restrict_lvl)
+    {
+        // a guest may still log in with a higher account, a logged in user just gets an error
+        if (empty($_SESSION['logged_in']))
+            redirect('login.php?error=5');
+
+        // error.php and footer.php run in this scope, give them the globals they read
+        global $output, $lang_global, $debug, $allow_anony, $github_repo, $time_start, $tot_queries,
+            $sql, $sqlr, $sqlc, $sqlm, $sqlw;
+        define('ERROR_MSG', $lang_global['err_no_permission']);
+        require 'error.php';
+        exit();
+    }
 }
 
 
@@ -54,6 +66,41 @@ function redirect($url)
     }
     else 
         die('<meta http-equiv="refresh" content="0;URL='.$url.'" />');
+}
+
+
+//#############################################################################
+// CSRF protection: one random token per session.
+// put csrf_field() in every form (or csrf=csrf_token() in action links)
+// and call csrf_check() first in every handler that changes data.
+function csrf_token()
+{
+    if (empty($_SESSION['csrf']))
+        $_SESSION['csrf'] = bin2hex(random_bytes(32));
+    return $_SESSION['csrf'];
+}
+
+function csrf_field()
+{
+    return '<input type="hidden" name="csrf" value="'.csrf_token().'" />';
+}
+
+function csrf_check()
+{
+    $token = $_POST['csrf'] ?? $_GET['csrf'] ?? '';
+    if (!is_string($token) || empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $token))
+    {
+        http_response_code(403);
+        exit('Invalid or expired security token. Go back, reload the page and try again.');
+    }
+}
+
+
+//#############################################################################
+// returns the highest GM level of an account on a realm, 0 if it has none
+function get_user_lvl(&$sqlr, $user_id, $realm_id)
+{
+    return (int)$sqlr->result($sqlr->query('SELECT MAX(SecurityLevel) FROM account_access WHERE AccountID = '.(int)$user_id.' AND (RealmID = '.(int)$realm_id.' OR RealmID = -1)'), 0);
 }
 
 

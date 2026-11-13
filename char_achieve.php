@@ -245,6 +245,81 @@ function char_achievements(&$sqlr, &$sqlc)
 
             $points = 0;
 
+            $char_side = char_get_side_id($char['race']); // 0 = Alliance, 1 = Horde
+            $hidden_opposite_achieves = array();
+            $hidden_opposite_cats = array();
+
+            // Palabras clave exclusivas de cada facción (ES / EN)
+            $alliance_terms = array(
+                'alliance', 'alianza', 'stormwind', 'ventormenta', 'ironforge', 'forjaz',
+                'darnassus', 'gnomeregan', 'exodar', 'silver covenant', 'pacto de plata',
+                'valiance expedition', 'expedición de denuedo', 'explorers\' league', 'liga de expedicionarios',
+                'frostborn', 'natohielo', 'kurenai', 'honor hold', 'basti&oacute;n del honor', 'bastión del honor',
+                'wildhammer', 'martillo salvaje', 'stormpike', 'pico tormenta', 'silverwing', 'ala de plata',
+                'league of arathor', 'liga de arathor', 'varian wrynn', 'magni bronzebeard', 'tyrande', 'velen'
+            );
+            $horde_terms = array(
+                'horde', 'horda', 'orgrimmar', 'thunder bluff', 'cima del trueno',
+                'undercity', 'entrañas', 'entra&ntilde;as', 'darkspear', 'lanza negra', 'silvermoon', 'lunargenta',
+                'sunreavers', 'atracasol', 'warsong offensive', 'ofensiva grito de guerra', 'hand of vengeance', 'mano de la venganza',
+                'taunka', 'mag\'har', 'thrallmar', 'frostwolf', 'lobo gélido', 'lobo g&eacute;lido',
+                'warsong outriders', 'escoltas grito de guerra', 'defilers', 'rapiñadores', 'rapi&ntilde;adores',
+                'thrall', 'sylvanas', 'cairne', 'lor\'themar'
+            );
+
+            $opp_terms = ($char_side == 0) ? $horde_terms : $alliance_terms;
+            $own_terms = ($char_side == 0) ? $alliance_terms : $horde_terms;
+
+            // 1. Detectar categorías exclusivas de la facción contraria
+            $q_cats = $sqlm->query("SELECT id, name01 FROM dbc_achievement_category");
+            if ($q_cats)
+            {
+                while ($cr = $sqlm->fetch_assoc($q_cats))
+                {
+                    $cname_low = mb_strtolower($cr['name01'], 'UTF-8');
+                    foreach ($opp_terms as $term)
+                    {
+                        if (strpos($cname_low, $term) !== false)
+                        {
+                            $hidden_opposite_cats[intval($cr['id'])] = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 2. Detectar logros individuales exclusivos de la facción contraria
+            $q_all_ach = $sqlm->query("SELECT id, categoryid, name01, description01 FROM dbc_achievement");
+            if ($q_all_ach)
+            {
+                while ($ar = $sqlm->fetch_assoc($q_all_ach))
+                {
+                    $aid = intval($ar['id']);
+                    $acid = intval($ar['categoryid']);
+                    if (isset($hidden_opposite_cats[$acid]))
+                    {
+                        $hidden_opposite_achieves[$aid] = true;
+                        continue;
+                    }
+                    $txt_low = mb_strtolower($ar['name01'] . ' ' . $ar['description01'], 'UTF-8');
+                    $has_opp = false;
+                    $has_own = false;
+                    foreach ($opp_terms as $term)
+                    {
+                        if (preg_match('/\b' . preg_quote($term, '/') . '\b/u', $txt_low)) { $has_opp = true; break; }
+                    }
+                    if ($has_opp)
+                    {
+                        foreach ($own_terms as $term)
+                        {
+                            if (preg_match('/\b' . preg_quote($term, '/') . '\b/u', $txt_low)) { $has_own = true; break; }
+                        }
+                        if (!$has_own)
+                            $hidden_opposite_achieves[$aid] = true;
+                    }
+                }
+            }
+
             $main_cats = achieve_get_main_category($sqlm);
             $sub_cats  = achieve_get_sub_category($sqlm);
 
@@ -301,7 +376,7 @@ function char_achievements(&$sqlr, &$sqlc)
                                 }
                                 $points += $cid['rewpoints'];
                             }
-                            elseif ($show_type && isset($achieve_id))
+                            elseif ($show_type && isset($achieve_id) && !isset($hidden_opposite_achieves[intval($cid['id'])]))
                             {
                                 $cid['name01'] = str_replace('&', '&amp;', $cid['name01']);
                                 $cid['description01'] = str_replace('&', '&amp;', $cid['description01']);
@@ -383,7 +458,7 @@ function char_achievements(&$sqlr, &$sqlc)
                                             }
                                             $points += $cid['rewpoints'];
                                         }
-                                        elseif ($show_type && isset($achieve_id))
+                                        elseif ($show_type && isset($achieve_id) && !isset($hidden_opposite_achieves[intval($cid['id'])]))
                                         {
                                             $cid['name01'] = str_replace('&', '&amp;', $cid['name01']);
                                             $cid['description01'] = str_replace('&', '&amp;', $cid['description01']);
