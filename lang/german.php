@@ -276,7 +276,11 @@ $lang_header =
   'account' => '--Benutzerkonto--',
   'edit_my_acc' => 'Meine Daten &auml;ndern',
   'logout' => 'Abmelden',
-    ];
+  'unstuck' => 'Befreien',
+  'unstuck_online' => 'Charakter ist online (Bitte zuerst ausloggen)',
+  'unstuck_tooltip' => 'Charakter befreien (Muss offline sein)',
+  'unstuck_confirm' => '%s zum Ruhestein-Ort teleportieren?\n\nCharakter muss offline sein.\n\nHinweis: Wenn du tot bist, musst du einen Geistheiler zum Wiederbeleben suchen.',
+];
   return $lang_header;
 }
 
@@ -1124,6 +1128,10 @@ function lang_stat()
   'max_players' => 'Maximal Spieler online seit',
   'max_ever' => 'erster Start',
   'max_restart' => 'letzter restart',
+        'uptime_graph' => 'Spielerverlauf (Uptime)',
+        'group_day' => 'Tage',
+        'group_week' => 'Wochen',
+        'group_month' => 'Monate',
       ];
   return $lang_stat;
 }

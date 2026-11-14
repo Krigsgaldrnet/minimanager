@@ -279,7 +279,11 @@ function lang_header()
     'account' => '------Account-----',
     'edit_my_acc' => 'Edit My Account',
     'logout' => 'Logout',
-      ];
+    'unstuck' => 'Unstuck',
+    'unstuck_online' => 'Character is online (Must log out first)',
+    'unstuck_tooltip' => 'Unstuck Character (Must be offline)',
+    'unstuck_confirm' => "Teleport %s to Hearthstone location?\n\nCharacter must be offline.\n\nWarning: if you are dead, you will need to find a Spirit Healer to resurrect.",
+];
   return $lang_header;
 }
 
@@ -1247,6 +1251,10 @@ function lang_stat()
     'max_players' => 'Max players online since',
     'max_ever' => 'First run',
     'max_restart' => 'Last restart',
+        'uptime_graph' => 'Players History (Uptime)',
+        'group_day' => 'Days',
+        'group_week' => 'Weeks',
+        'group_month' => 'Months',
       ];
   return $lang_stat;
 }

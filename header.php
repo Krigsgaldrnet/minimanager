@@ -205,9 +205,9 @@ if (isset($_SESSION['user_lvl']) && isset($_SESSION['uname']) && isset($_SESSION
     unset($trunk);
     unset($menu_array);
 
-    $output .= '
-                            <li><a href="edit.php">'.$lang_header['my_acc'].'</a>
-                        <ul>';
+          $output .= '
+            <li><a href="edit.php">'.$lang_header['my_acc'].'</a>
+              <ul style="min-width: 230px;">';
 
     $result = $sqlr->query('SELECT id, name FROM `realmlist` LIMIT 10');
 
@@ -244,7 +244,7 @@ if (isset($_SESSION['user_lvl']) && isset($_SESSION['uname']) && isset($_SESSION
     }
     else
     {
-        $result = $sqlc->query('SELECT guid, BINARY name AS name, race, class, level, gender
+        $result = $sqlc->query('SELECT guid, BINARY name AS name, race, class, level, gender, online, online
                             FROM characters
                             WHERE account = '.$user_id.'');
 
@@ -252,16 +252,32 @@ if (isset($_SESSION['user_lvl']) && isset($_SESSION['uname']) && isset($_SESSION
         if($sqlc->num_rows($result))
         {
             $output .= '
-                            <li><a href="#">'.$lang_header['my_characters'].'</a></li>';
+              <li><a href="#">'.$lang_header['my_characters'].'</a></li>';
             while ($char = $sqlc->fetch_assoc($result))
             {
-                $output .= '
-                            <li>
-                                <a href="char.php?id='.$char['guid'].'">
-                                <img src="img/c_icons/'.$char['race'].'-'.$char['gender'].'.gif" alt="" /><img src="img/c_icons/'.$char['class'].'.gif" alt="" />'.
-                                $char['name'].'
-                                </a>
-                            </li>';
+              $lbl_unstuck = $lang_header['unstuck'];
+              $msg_online  = htmlspecialchars($lang_header['unstuck_online'], ENT_QUOTES, 'UTF-8');
+              $msg_tooltip = htmlspecialchars($lang_header['unstuck_tooltip'], ENT_QUOTES, 'UTF-8');
+              $msg_confirm = sprintf($lang_header['unstuck_confirm'], $char['name']);
+              $js_confirm  = htmlspecialchars(json_encode($msg_confirm, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
+
+              if ((int)$char['online'] === 1)
+              {
+                $unstuck_html = '<span title="'.$msg_online.'" style="width:auto; padding-left:8px; padding-right:8px; color:#ff4444; cursor:not-allowed;">['.$lbl_unstuck.']</span>';
+              }
+              else
+              {
+                $unstuck_html = '<a href="unstuck.php?id='.$char['guid'].'" title="'.$msg_tooltip.'" onclick="return confirm('.$js_confirm.');" style="width:auto; padding-left:8px; padding-right:8px; color:#ffcc00;">['.$lbl_unstuck.']</a>';
+              }
+
+              $output .= '
+                <li style="display:flex; justify-content:space-between; align-items:center; white-space:nowrap;">
+                  <a href="char.php?id='.$char['guid'].'" style="flex:1; width:auto;">
+                    <img src="img/c_icons/'.$char['race'].'-'.$char['gender'].'.gif" alt="" /><img src="img/c_icons/'.$char['class'].'.gif" alt="" /><img src="img/c_icons/'.$char['class'].'.gif" alt="" />'.
+                    $char['name'].'
+                  </a>
+                  '.$unstuck_html.'
+                </li>';
             }
             unset($char);
         }

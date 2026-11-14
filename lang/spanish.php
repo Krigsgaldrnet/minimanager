@@ -279,7 +279,11 @@ function lang_header()
     'account' => '------Cuenta------',
     'edit_my_acc' => 'Editar mi cuenta',
     'logout' => 'Cerrar sesión',
-      ];
+    'unstuck' => 'Liberar',
+    'unstuck_online' => 'El personaje está conectado (Debes desconectarlo primero)',
+    'unstuck_tooltip' => 'Liberar personaje (Debe estar desconectado)',
+    'unstuck_confirm' => '¿Teletransportar a %s a su piedra de hogar?\n\nEl personaje debe estar desconectado.\n\nAviso: si estás muerto, tendrás que buscar un Ángel de la Resurrección para revivir.',
+];
   return $lang_header;
 }
 
@@ -1149,6 +1153,10 @@ function lang_stat()
     'max_players' => 'Máximo de jugadores conectados desde',
     'max_ever' => 'Primer inicio',
     'max_restart' => 'Último reinicio',
+        'uptime_graph' => 'Historial de Jugadores (Uptime)',
+        'group_day' => 'Días',
+        'group_week' => 'Semanas',
+        'group_month' => 'Meses',
       ];
   return $lang_stat;
 }
