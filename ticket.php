@@ -14,13 +14,13 @@ class tickets
 		global $output, $lang_global, $lang_ticket, $action_permission, $user_lvl, $itemperpage, $sqlr, $showcountryflag, $sqlm;
 
 		//==========================$_GET and SECURE=================================
-		$start = (isset($_GET['start'])) ? $sqlc->quote_smart($_GET['start']) : 0;
+		$start = (isset($_GET['start'])) ? $sqlc->quote_smart(($_GET['start'] ?? '')) : 0;
 		$start = (is_numeric($start)) ? $start : 0;
 	
-        $order_by = (isset($_GET['order_by'])) ? $sqlc->quote_smart($_GET['order_by']) : 'id';
+        $order_by = (isset($_GET['order_by'])) ? $sqlc->quote_smart(($_GET['order_by'] ?? '')) : 'id';
         $order_by = (preg_match('/^[_[:lower:]]{1,10}$/', $order_by)) ? $order_by : 'id';
 			
-        $dir = (isset($_GET['dir'])) ? $sqlc->quote_smart($_GET['dir']) : 1;
+        $dir = (isset($_GET['dir'])) ? $sqlc->quote_smart(($_GET['dir'] ?? '')) : 1;
 		$dir = (preg_match('/^[01]{1}$/', $dir)) ? $dir : 1;
 
 		$order_dir = ($dir) ? 'ASC' : 'DESC';
@@ -82,12 +82,12 @@ class tickets
 			$output .="
 								<td>$ticket[0]</td>
 								<td>".($ticket[4] ? "<img src=\"img/up.gif\" alt=\"online\">" : "<img src=\"img/down.gif\" alt=\"offline\">")."</td>
-								<td><a href=\"char.php?id=$ticket[1]\">".htmlentities($ticket[3])."</a></td>
+								<td><a href=\"char.php?id=$ticket[1]\">".htmlentities($ticket[3] ?? '')."</a></td>
 								";
                         $acc_id = intval($ticket[5]);
                         $acc_q = $sqlr->query("SELECT username, last_ip FROM account WHERE id = $acc_id LIMIT 1");
                         $acc_r = $acc_q ? $sqlr->fetch_assoc($acc_q) : null;
-                        $acc_name = $acc_r ? htmlentities($acc_r['username']) : '-';
+                        $acc_name = $acc_r ? htmlentities($acc_r['username'] ?? '') : '-';
                         $acc_ip = $acc_r ? $acc_r['last_ip'] : '-';
                         $flag_html = '';
                         if ($showcountryflag && $acc_ip && $acc_ip !== '-')
@@ -101,7 +101,7 @@ class tickets
                         $output .= "
                                                                 <td><a href=\"user.php?action=edit_user&amp;error=11&amp;id=$acc_id\">$acc_name</a></td>
                                                                 <td style=\"white-space:nowrap;\">$flag_html$ip_link</td>
-                                                                <td>".htmlentities($ticket[2])."</td>
+                                                                <td>".htmlentities($ticket[2] ?? '')."</td>
 							</tr>";
 		}
 		unset($query);
@@ -147,7 +147,7 @@ function delete_tickets()
     $sqlc = new SQL;
     $sqlc->connect($characters_db[$realm_id]['addr'], $characters_db[$realm_id]['user'], $characters_db[$realm_id]['pass'], $characters_db[$realm_id]['name']);
 
-    $check = $sqlc->quote_smart($_GET['check']);
+    $check = $sqlc->quote_smart(($_GET['check'] ?? ''));
 
     $deleted_tickets = 0;
 	if (is_array($check) || is_object($check))
@@ -180,7 +180,7 @@ function edit_ticket()
     $sqlc = new SQL;
     $sqlc->connect($characters_db[$realm_id]['addr'], $characters_db[$realm_id]['user'], $characters_db[$realm_id]['pass'], $characters_db[$realm_id]['name']);
 
-    $id = $sqlc->quote_smart($_GET['id']);
+    $id = $sqlc->quote_smart(($_GET['id'] ?? ''));
     if(!is_numeric($id))
         redirect("ticket.php?error=1");
 
@@ -204,11 +204,11 @@ function edit_ticket()
                                 </tr>
                                 <tr>
                                     <td>{$lang_ticket['submitted_by']}:</td>
-                                    <td><a href=\"char.php?id=$ticket[0]\">".htmlentities($ticket[2])."</a></td>
+                                    <td><a href=\"char.php?id=$ticket[0]\">".htmlentities($ticket[2] ?? '')."</a></td>
                                 </tr>
                                 <tr>
                                     <td valign=\"top\">{$lang_ticket['ticket_text']}</td>
-                                    <td><textarea name=\"new_text\" rows=\"5\" cols=\"40\" maxlength=\"500\">".htmlentities($ticket[1])."</textarea></td>
+                                    <td><textarea name=\"new_text\" rows=\"5\" cols=\"40\" maxlength=\"500\">".htmlentities($ticket[1] ?? '')."</textarea></td>
                                 </tr>
                                 <tr>
                                     <td>";
@@ -261,10 +261,10 @@ function do_edit_ticket()
     $sqlc = new SQL;
     $sqlc->connect($characters_db[$realm_id]['addr'], $characters_db[$realm_id]['user'], $characters_db[$realm_id]['pass'], $characters_db[$realm_id]['name']);
 
-    $new_text = $sqlc->quote_smart($_POST['new_text']);
+    $new_text = $sqlc->quote_smart(($_POST['new_text'] ?? ''));
 	$new_text = str_replace('\\\\r\\', '', $new_text);
 	
-    $id = $sqlc->quote_smart($_POST['id']);
+    $id = $sqlc->quote_smart(($_POST['id'] ?? ''));
     if(is_numeric($id))
 		$query = $sqlc->query("UPDATE gm_ticket SET description='$new_text' WHERE id = '$id'");
     else
@@ -280,7 +280,7 @@ function do_edit_ticket()
 //########################################################################################################################
 // MAIN
 //########################################################################################################################
-$err = (isset($_GET['error'])) ? $_GET['error'] : NULL;
+$err = (isset($_GET['error'])) ? ($_GET['error'] ?? '') : NULL;
 
 $output .= "
         <div class=\"top\">";
@@ -333,7 +333,7 @@ unset($err);
 $output .= "
         </div>";
 
-$action = (isset($_GET['action'])) ? $_GET['action'] : NULL;
+$action = (isset($_GET['action'])) ? ($_GET['action'] ?? '') : NULL;
 
 $tickets = new tickets;
 

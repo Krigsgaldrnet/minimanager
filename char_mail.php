@@ -36,7 +36,7 @@ function build_mail_items_cell($items_list, $site, &$sqlm, &$sqlw) {
         $nm_safe = htmlspecialchars($nm, ENT_QUOTES, "UTF-8");
         $tot = $data["total"];
         $st  = ($tot > 1) ? " x" . $tot : "";
-        if (count($data["stacks"]) > 1) {
+        if (count($data["stacks"] ?? []) > 1) {
             $counts = array_count_values($data["stacks"]);
             $parts_str = array();
             foreach ($counts as $val => $times) {
@@ -156,13 +156,13 @@ function char_mail(&$sqlr, &$sqlc)
                                 <tr valign=top>
                                     <td>'.get_mail_source($mail['messagetype']).'</td>
                                     <td><a href="char.php?id='.$mail['sender'].'">'.get_char_name($mail['sender']).'</a></td>
-                                    <td>'.htmlspecialchars($mail['subject'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</td>
+                                    <td>'.htmlspecialchars($mail['subject'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</td>
                                     <td>'.build_mail_items_cell($mail['items_list'], $item_datasite, $sqlm, $sqlw).'</td>
-                                    <td>'.htmlspecialchars($mail['body'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</td>
+                                    <td>'.htmlspecialchars($mail['body'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</td>
                                     <td>
-                                        '.substr($mail['money'],  0, -4).'<img src="img/gold.gif" alt="" align="middle" />
-                                        '.substr($mail['money'], -4,  2).'<img src="img/silver.gif" alt="" align="middle" />
-                                        '.substr($mail['money'], -2).'<img src="img/copper.gif" alt="" align="middle" />
+                                        '.substr(($mail['money'] ?? '0'),  0, -4).'<img src="img/gold.gif" alt="" align="middle" />
+                                        '.substr(($mail['money'] ?? '0'), -4,  2).'<img src="img/silver.gif" alt="" align="middle" />
+                                        '.substr(($mail['money'] ?? '0'), -2).'<img src="img/copper.gif" alt="" align="middle" />
                                     </td>
                                     <td>'.get_check_state($mail['checked']).'</td>
                                 </tr>';

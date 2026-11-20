@@ -73,7 +73,7 @@ function forum_index(){
                         <td>{$numtopics}</td>
                         <td>{$numreplies}</td>";
             if(isset($lasts[$id])){
-                $lasts[$id][2] = htmlspecialchars($lasts[$id][2]);
+                $lasts[$id][2] = htmlspecialchars($lasts[$id][2] ?? '');
                 $output .= "<td align=\"right\"><a href=\"forum.php?action=view_topic&amp;postid={$lasts[$id][1]}\">{$lasts[$id][2]}</a><br />by {$lasts[$id][0]} <br /> {$lasts[$id][3]} </td></tr>";
             }
             else{
@@ -98,9 +98,9 @@ function forum_view_forum(){
 	  error($forum_lang["no_such_forum"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_GET["id"]);
+  else $id = $mysql->quote_smart(($_GET["id"] ?? ''));
   if(!isset($_GET["page"])) $page = 0;
-  else $page = $mysql->quote_smart($_GET["page"]);
+  else $page = $mysql->quote_smart(($_GET["page"] ?? ''));
   $cat = 0;
   foreach($forum_skeleton as $cid => $category){
     foreach($category["forums"] as $fid => $forum){
@@ -164,7 +164,7 @@ function forum_view_forum(){
                     $output .= "[{$forum_lang["closed"]}] ";
                 }
               }
-              $topic[3] = htmlspecialchars($topic[3]);
+              $topic[3] = htmlspecialchars($topic[3] ?? '');
               $output .= "<a href=\"forum.php?action=view_topic&amp;id={$topic[0]}\">{$topic[3]}</a></td><td>{$topic[2]}</td>
               <td>{$lasts[$topic[0]][1]}</td>
               <td>{$forum_lang["last_post_by"]} {$lasts[$topic[0]][3]}, {$lasts[$topic[0]][4]}</td>
@@ -198,12 +198,12 @@ function forum_view_topic(){
   $link = $mysql->connect($mmfpm_db['addr'], $mmfpm_db['user'], $mmfpm_db['pass'], $mmfpm_db['name']);
 
   if(isset($_GET["id"])){
-    $id = $mysql->quote_smart($_GET["id"]);
+    $id = $mysql->quote_smart(($_GET["id"] ?? ''));
     $post = false;
   }
   else{
     if(isset($_GET["postid"])){
-      $id = $mysql->quote_smart($_GET["postid"]);
+      $id = $mysql->quote_smart(($_GET["postid"] ?? ''));
       $post = true;
     }
     else{
@@ -214,7 +214,7 @@ function forum_view_topic(){
 
 
   if(!isset($_GET["page"])) $page = 0;
-  else $page = $mysql->quote_smart($_GET["page"]); // Fok you mathafoker haxorz
+  else $page = $mysql->quote_smart(($_GET["page"] ?? '')); // Fok you mathafoker haxorz
   $start = ($maxqueries * $page);
 
   if(!$post){
@@ -284,8 +284,8 @@ $query .= "0) GROUP BY account);";
       }
     }
 
-    $post[4] = htmlspecialchars($post[4]);
-    $post[5] = htmlspecialchars($post[5]);
+    $post[4] = htmlspecialchars($post[4] ?? '');
+    $post[5] = htmlspecialchars($post[5] ?? '');
     $post[5] = bbcode_parse($post[5]);
 
     $output .= "<div class=\"top\"><h1>{$forum_lang["forums"]}</h1>{$forum_lang["you_are_here"]} : <a href=\"forum.php\">{$forum_lang["forum_index"]}</a> -> <a href=\"forum.php?action=view_forum&amp;id={$fid}\">{$forum["name"]}</a> -> <a href=\"forum.php?action=view_topic&amp;id={$id}\">{$post[4]}</a></div>
@@ -356,7 +356,7 @@ $query .= "0) GROUP BY account);";
           $closed = $post[9];
 
     while($post = $mysql->fetch_row($posts)){
-          $post[5] = htmlspecialchars($post[5]);
+          $post[5] = htmlspecialchars($post[5] ?? '');
           $post[5] = bbcode_parse($post[5]);
 
             if(isset($avatars[$post[1]]))
@@ -496,13 +496,13 @@ function forum_do_edit_close(){
 	  error($forum_lang["no_such_topic"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_GET["id"]);
+  else $id = $mysql->quote_smart(($_GET["id"] ?? ''));
 
   if(!isset($_GET["state"])){
 	  error("Bad request, please mail admin and describe what you did to get this error.");
 	  return;
   }
-  else $state = $mysql->quote_smart($_GET["state"]);
+  else $state = $mysql->quote_smart(($_GET["state"] ?? ''));
 
   $mysql->query("UPDATE mm_forum_posts SET closed = '$state' WHERE id = '$id'");
   $mysql->close();
@@ -524,13 +524,13 @@ function forum_do_edit_announce(){
 	  error($forum_lang["no_such_topic"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_GET["id"]);
+  else $id = $mysql->quote_smart(($_GET["id"] ?? ''));
 
   if(!isset($_GET["state"])){
 	  error("Bad request, please mail admin and describe what you did to get this error.");
 	  return;
   }
-  else $state = $mysql->quote_smart($_GET["state"]);
+  else $state = $mysql->quote_smart(($_GET["state"] ?? ''));
 
   $mysql->query("UPDATE mm_forum_posts SET annouced = '$state' WHERE id = '$id'");
   $mysql->close();
@@ -552,13 +552,13 @@ function forum_do_edit_stick(){
 	  error($forum_lang["no_such_topic"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_GET["id"]);
+  else $id = $mysql->quote_smart(($_GET["id"] ?? ''));
 
   if(!isset($_GET["state"])){
 	  error("Bad request, please mail admin and describe what you did to get this error.");
 	  return;
   }
-  else $state = $mysql->quote_smart($_GET["state"]);
+  else $state = $mysql->quote_smart(($_GET["state"] ?? ''));
 
   $mysql->query("UPDATE mm_forum_posts SET sticked = '$state' WHERE id = '$id'");
   $mysql->close();
@@ -574,7 +574,7 @@ function forum_delete_post(){
 	  error($forum_lang["no_such_post"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_GET["id"]);
+  else $id = $mysql->quote_smart(($_GET["id"] ?? ''));
 
   $topic = $mysql->query("SELECT id,topic,authorid,forum FROM mm_forum_posts WHERE id = '$id';");
   if($mysql->num_rows($topic)==0){
@@ -625,7 +625,7 @@ function forum_do_delete_post(){
 	  error($forum_lang["no_such_post"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_GET["id"]);
+  else $id = $mysql->quote_smart(($_GET["id"] ?? ''));
 
   $topic = $mysql->query("SELECT id,topic,name,authorid,forum FROM mm_forum_posts WHERE id = '$id';");
   if($mysql->num_rows($topic)==0){
@@ -647,8 +647,8 @@ function forum_do_delete_post(){
   {
     $mysql->query("DELETE FROM mm_forum_posts WHERE id = '$id'");
     $result = $mysql->query("SELECT id FROM mm_forum_posts WHERE topic = '{$topic[1]}' ORDER BY id DESC LIMIT 1;"); // get last post id
-    $lastpostid = $mysql->fetch_row($result);
-    $lastpostid = $lastpostid[0];
+    $lastpostid_row = $mysql->fetch_row($result);
+                $lastpostid = $lastpostid_row[0] ?? 0;
     $mysql->query("UPDATE mm_forum_posts SET lastpost = '$lastpostid' WHERE id = '{$topic[1]}'"); // update topic' s last post id
     redirect("forum.php?action=view_topic&id={$topic[1]}");
   }
@@ -681,7 +681,7 @@ function forum_add_topic(){
 	  error($forum_lang["no_such_forum"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_GET["id"]);
+  else $id = $mysql->quote_smart(($_GET["id"] ?? ''));
 
   $cat = 0;
   foreach($forum_skeleton as $cid => $category){
@@ -787,7 +787,7 @@ if($minfloodtime > 0)
 	  error($forum_lang["no_such_forum"]);
 	  return;
   }
-  else $forum = $mysql->quote_smart($_POST['forum']);
+  else $forum = $mysql->quote_smart(($_POST['forum'] ?? ''));
 
   $cat = 0;
   foreach($forum_skeleton as $cid => $category){
@@ -821,10 +821,10 @@ if($minfloodtime > 0)
     }
   }
 
-//  $_POST['msg'] = htmlspecialchars($_POST['msg']);
-  $msg = trim($mysql->quote_smart($_POST['msg']), " ");
-//  $_POST['name'] = htmlspecialchars($_POST['name']);
-  $name = trim($mysql->quote_smart($_POST['name']), " ");
+//  $_POST['msg'] = htmlspecialchars($_POST['msg'] ?? '');
+  $msg = trim($mysql->quote_smart(($_POST['msg'] ?? '')), " ");
+//  $_POST['name'] = htmlspecialchars($_POST['name'] ?? '');
+  $name = trim($mysql->quote_smart(($_POST['name'] ?? '')), " ");
 
   if (strlen($name) > 49){
     $mysql->close();
@@ -886,7 +886,7 @@ function forum_do_add_post(){
 	  error($forum_lang["no_such_forum"]);
 	  return;
   }
-  else $forum = $mysql->quote_smart($_POST['forum']);
+  else $forum = $mysql->quote_smart(($_POST['forum'] ?? ''));
 
   $cat = 0;
   foreach($forum_skeleton as $cid => $category){
@@ -925,14 +925,14 @@ function forum_do_add_post(){
 	  error($forum_lang["no_such_topic"]);
 	  return;
   }
-  else $topic = (int)$_POST['topic'];
+  else $topic = (int)($_POST['topic'] ?? '');
   if($topic < 1){
 	  error($forum_lang["no_such_topic"]);
 	  return;
   }
 
-//  $_POST['msg'] = htmlspecialchars($_POST['msg']);
-  $msg = trim($mysql->quote_smart($_POST['msg']), " ");
+//  $_POST['msg'] = htmlspecialchars($_POST['msg'] ?? '');
+  $msg = trim($mysql->quote_smart(($_POST['msg'] ?? '')), " ");
 
   $msg = str_replace('\n', '<br />', $msg);
   $msg = str_replace('\r', '<br />', $msg);
@@ -969,7 +969,7 @@ function forum_edit_post(){
 	  error($forum_lang["no_such_post"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_GET["id"]);
+  else $id = $mysql->quote_smart(($_GET["id"] ?? ''));
 
   $post = $mysql->query("SELECT id,topic,authorid,forum,name,text FROM mm_forum_posts WHERE id = '$id';");
   if($mysql->num_rows($post)==0) error($forum_lang["no_such_post"]);
@@ -1056,12 +1056,12 @@ function forum_do_edit_post(){
 	 error($forum_lang["no_such_forum"]);
 	 return;
   }
-  else $forum = $mysql->quote_smart($_POST['forum']);
+  else $forum = $mysql->quote_smart(($_POST['forum'] ?? ''));
   if(!isset($_POST['post'])){
 	  error($forum_lang["no_such_post"]);
 	  return;
   }
-  else $post = (int)$_POST['post'];
+  else $post = (int)($_POST['post'] ?? '');
   if($post < 1){
 	  error($forum_lang["no_such_post"]);
 	  return;
@@ -1071,8 +1071,8 @@ function forum_do_edit_post(){
     $topic = 0;
   else{
     $topic = 1;
-//    htmlspecialchars($_POST['name']);
-    $name = $mysql->quote_smart($_POST['name']);
+//    htmlspecialchars($_POST['name'] ?? '');
+    $name = $mysql->quote_smart(($_POST['name'] ?? ''));
     if (strlen($name) > 49){
       $mysql->close();
       error($forum_lang["name_too_long"]);
@@ -1085,8 +1085,8 @@ function forum_do_edit_post(){
     }
   }
 
-//  $_POST['msg'] = htmlspecialchars($_POST['msg']);
-  $msg = trim($mysql->quote_smart($_POST['msg']), " ");
+//  $_POST['msg'] = htmlspecialchars($_POST['msg'] ?? '');
+  $msg = trim($mysql->quote_smart(($_POST['msg'] ?? '')), " ");
 
   if (strlen($msg) < 5){
     $mysql->close();
@@ -1135,7 +1135,7 @@ function forum_move_topic(){
 	  error($forum_lang["no_such_topic"]);
 	  return;
   }
-  else $id = $mysql->quote_smart($_GET["id"]);
+  else $id = $mysql->quote_smart(($_GET["id"] ?? ''));
 
   $topic = $mysql->query("SELECT id,topic,authorid,forum, name FROM mm_forum_posts WHERE id = '$id';");
   //                0 1   2   3   4
@@ -1198,12 +1198,12 @@ function forum_do_move_topic(){
 	  error($forum_lang["no_such_forum"]);
 	  return;
   }
-  else $forum = (int)$_POST['forum'];
+  else $forum = (int)($_POST['forum'] ?? '');
   if(!isset($_POST['id'])){
 	  error($forum_lang["no_such_topic"]);
 	  return;
   }
-  else $id = (int)$_POST['id'];
+  else $id = (int)($_POST['id'] ?? '');
 
   // Same rule as forum_move_topic(): moderators only.
   if($user_lvl == 0){
@@ -1231,7 +1231,7 @@ function forum_do_move_topic(){
 
 
 if(isset($_GET['action']))
-    $action = addslashes($_GET['action']);
+    $action = addslashes(($_GET['action'] ?? ''));
 else $action = NULL;
 
 $forum_lang = lang_forum();

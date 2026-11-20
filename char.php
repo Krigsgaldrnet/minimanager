@@ -64,7 +64,7 @@ function char_main(&$sqlr, &$sqlc)
                                     FROM characters LEFT JOIN character_stats ON characters.guid = character_stats.guid LEFT JOIN guild_member ON characters.guid = guild_member.guid WHERE characters.guid = '.$id);
 
             $char = $sqlc->fetch_assoc($result);
-            $eq_data = explode(' ',$char['equipmentCache']);
+            $eq_data = array_pad(explode(' ', $char['equipmentCache'] ?? ''), 38, 0);
 
             $online = ($char['online']) ? $lang_char['online'] : $lang_char['offline'];
 
@@ -81,15 +81,15 @@ function char_main(&$sqlr, &$sqlc)
                 $guild_rank = $lang_global['none'];
             }
 
-            $block       = round($char['blockPct'],2);
-            $dodge       = round($char['dodgePct'],2);
-            $parry       = round($char['parryPct'],2);
-            $crit        = round($char['critPct'],2);
-            $ranged_crit = round($char['rangedCritPct'],2);
-            $spell_crit = round($char['spellCritPct'],2);
-            $spell_damage = $char['spellPower'];
-            $rage       = round($char['power2'] / 10);
-            $maxrage    = round($char['maxpower2'] / 10);
+            $block       = round($char['blockPct'] ?? 0, 2);
+            $dodge       = round($char['dodgePct'] ?? 0, 2);
+            $parry       = round($char['parryPct'] ?? 0, 2);
+            $crit        = round($char['critPct'] ?? 0, 2);
+            $ranged_crit = round($char['rangedCritPct'] ?? 0, 2);
+            $spell_crit  = round($char['spellCritPct'] ?? 0, 2);
+            $spell_damage = $char['spellPower'] ?? 0;
+            $rage        = round(($char['power2'] ?? 0) / 10);
+            $maxrage     = round(($char['maxpower2'] ?? 0) / 10);
 
             //preventing undefined variables, didnt want to remove all this stuff so just filling the missing variables with 0
             define('CHAR_DATA_OFFSET_MELEE_HIT',0);
@@ -271,7 +271,7 @@ function char_main(&$sqlr, &$sqlc)
                                     </td>
                                     <td colspan="4">
                                         <font class="bold">
-                                            '.htmlentities($char['name']).' -
+                                            '.htmlentities($char['name'] ?? '').' -
                                             <img src="img/c_icons/'.$char['race'].'-'.$char['gender'].'.gif" onmousemove="toolTip(\''.char_get_race_name($char['race']).'\', \'item_tooltip\')" onmouseout="toolTip()" alt="" />
                                             <img src="img/c_icons/'.$char['class'].'.gif" onmousemove="toolTip(\''.char_get_class_name($char['class']).'\', \'item_tooltip\')" onmouseout="toolTip()" alt="" />
                                             - lvl '.char_get_level_color($char['level']).'

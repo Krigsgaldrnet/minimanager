@@ -14,15 +14,15 @@ function browse_teams()
     $sqlc->connect($characters_db[$realm_id]['addr'], $characters_db[$realm_id]['user'], $characters_db[$realm_id]['pass'], $characters_db[$realm_id]['name']);
 
     //==========================$_GET and SECURE=================================
-    $start = (isset($_GET['start'])) ? $sqlc->quote_smart($_GET['start']) : 0;
+    $start = (isset($_GET['start'])) ? $sqlc->quote_smart(($_GET['start'] ?? '')) : 0;
     if (is_numeric($start));
     else $start=0;
 
-    $order_by = (isset($_GET['order_by'])) ? $sqlc->quote_smart($_GET['order_by']) : "atid";
+    $order_by = (isset($_GET['order_by'])) ? $sqlc->quote_smart(($_GET['order_by'] ?? '')) : "atid";
     if (!preg_match("/^[_[:lower:]]{1,17}$/", $order_by))
         $order_by="atid";
 
-    $dir = (isset($_GET['dir'])) ? $sqlc->quote_smart($_GET['dir']) : 1;
+    $dir = (isset($_GET['dir'])) ? $sqlc->quote_smart(($_GET['dir'] ?? '')) : 1;
     if (!preg_match("/^[01]{1}$/", $dir))
         $dir=1;
 
@@ -34,8 +34,8 @@ function browse_teams()
     $search_value = '';
     if(isset($_GET['search_value']) && isset($_GET['search_by']))
     {
-        $search_value = $sqlc->quote_smart($_GET['search_value']);
-        $search_by = $sqlc->quote_smart($_GET['search_by']);
+        $search_value = $sqlc->quote_smart(($_GET['search_value'] ?? ''));
+        $search_by = $sqlc->quote_smart(($_GET['search_by'] ?? ''));
         $search_menu = ['atname', 'leadername', 'atid'];
 
         if (!in_array($search_by, $search_menu))
@@ -144,8 +144,8 @@ function browse_teams()
         $output .= "
                 <tr>
                     <td>$data[0]</td>
-                    <td><a href=\"arenateam.php?action=view_team&amp;error=3&amp;id=$data[0]\">".htmlentities($data[1])."</a></td>
-                    <td><a href=\"char.php?id=$data[2]\">".htmlentities($data[4])."</a></td>
+                    <td><a href=\"arenateam.php?action=view_team&amp;error=3&amp;id=$data[0]\">".htmlentities($data[1] ?? '')."</a></td>
+                    <td><a href=\"char.php?id=$data[2]\">".htmlentities($data[4] ?? '')."</a></td>
                     <td>{$lang_arenateam[$data[3]]}</td>
                     <td>$data[5]</td>
                     <td>$arenateam_online</td>
@@ -183,7 +183,7 @@ function view_team()
 
     $sqlc = new SQL;
     $sqlc->connect($characters_db[$realm_id]['addr'], $characters_db[$realm_id]['user'], $characters_db[$realm_id]['pass'], $characters_db[$realm_id]['name']);
-    $arenateam_id = $sqlc->quote_smart($_GET['id']);
+    $arenateam_id = $sqlc->quote_smart(($_GET['id'] ?? ''));
     $query = $sqlc->query("SELECT arenateamid, name, type FROM arena_team WHERE arenateamid = '$arenateam_id'");
     $arenateam_data = $sqlc->fetch_row($query);
     $query = $sqlc->query("SELECT arenateamid, rating, weekGames, weekWins, seasonGames, seasonWins, rank FROM arena_team WHERE arenateamid = '$arenateam_id'");
@@ -219,7 +219,7 @@ function view_team()
                 <legend>{$lang_arenateam['arenateam']} ({$arenateam_data[2]}v{$arenateam_data[2]})</legend>
                 <table class=\"lined\" style=\"width: 100%;\">
                     <tr class=\"bold\">
-                        <td colspan=\"".($showcountryflag ? 14 : 13 )."\">".htmlentities($arenateam_data[1])."</td>
+                        <td colspan=\"".($showcountryflag ? 14 : 13 )."\">".htmlentities($arenateam_data[1] ?? '')."</td>
                     </tr>
                     <tr>
                         <td colspan=\"".($showcountryflag ? 14 : 13 )."\">{$lang_arenateam['tot_members']}: $total_members</td>
@@ -293,7 +293,7 @@ function view_team()
             $ws_pct = $member[6];
 
         $output .= "
-                        <td><a href=\"char.php?id=$member[0]\">".htmlentities($member[1])."</a></td>
+                        <td><a href=\"char.php?id=$member[0]\">".htmlentities($member[1] ?? '')."</a></td>
                         <td><img src='img/c_icons/{$member[8]}-{$member[13]}.gif' onmousemove='toolTip(\"".char_get_race_name($member[8])."\",\"item_tooltip\")' onmouseout='toolTip()' /></td>
                         <td><img src='img/c_icons/{$member[9]}.gif' onmousemove='toolTip(\"".char_get_class_name($member[9])."\",\"item_tooltip\")' onmouseout='toolTip()' /></td>
                         <td>$member[2]</td>
@@ -360,7 +360,7 @@ function del_team()
     global $lang_arenateam, $lang_global, $output;
 
     if(isset($_GET['id']))
-        $id = $_GET['id'];
+        $id = ($_GET['id'] ?? '');
     else
         redirect("arenateam.php?error=1");
 
@@ -400,12 +400,12 @@ function rem_char_from_team()
     global $characters_db, $realm_id, $user_lvl;
 
     if(isset($_GET['id']))
-        $guid = $_GET['id'];
+        $guid = ($_GET['id'] ?? '');
     else
         redirect("arenateam.php?error=1");
 
     if(isset($_GET['arenateam_id']))
-        $arenateam_id = $_GET['arenateam_id'];
+        $arenateam_id = ($_GET['arenateam_id'] ?? '');
     else
         redirect("arenateam.php?error=1");
 
@@ -421,7 +421,7 @@ function rem_char_from_team()
 //########################################################################################################################
 // MAIN
 //########################################################################################################################
-$err = (isset($_GET['error'])) ? $_GET['error'] : NULL;
+$err = (isset($_GET['error'])) ? ($_GET['error'] ?? '') : NULL;
 
 $output .= "
     <div class=\"top\">";
@@ -458,7 +458,7 @@ switch ($err)
 $output .= "
     </div>";
 
-$action = (isset($_GET['action'])) ? $_GET['action'] : NULL;
+$action = (isset($_GET['action'])) ? ($_GET['action'] ?? '') : NULL;
 
 switch ($action)
 {

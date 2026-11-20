@@ -23,18 +23,18 @@ function browse_users(&$sqlr, &$sqlc)
     $sqlm->connect($mmfpm_db['addr'], $mmfpm_db['user'], $mmfpm_db['pass'], $mmfpm_db['name']);
 
     //-------------------SQL Injection Prevention--------------------------------
-    $start = (isset($_GET['start'])) ? $sqlr->quote_smart($_GET['start']) : 0;
+    $start = (isset($_GET['start'])) ? $sqlr->quote_smart(($_GET['start'] ?? '')) : 0;
     if (is_numeric($start))
         $start = (int)$start;
     else
         $start=0;
 
-    $order_by = (isset($_GET['order_by'])) ? $sqlr->quote_smart($_GET['order_by']) : 'id';
+    $order_by = (isset($_GET['order_by'])) ? $sqlr->quote_smart(($_GET['order_by'] ?? '')) : 'id';
     if (preg_match('/^[_[:lower:]]{1,15}$/', $order_by));
     else
         $order_by='id';
 
-    $dir = (isset($_GET['dir'])) ? $sqlr->quote_smart($_GET['dir']) : 1;
+    $dir = (isset($_GET['dir'])) ? $sqlr->quote_smart(($_GET['dir'] ?? '')) : 1;
     if (preg_match('/^[01]{1}$/', $dir));
     else
         $dir=1;
@@ -61,8 +61,8 @@ function browse_users(&$sqlr, &$sqlc)
     }
 
     // Multi-condition search support (AND)
-    $search_values = isset($_GET['search_value']) ? (array)$_GET['search_value'] : [''];
-    $search_bys = isset($_GET['search_by']) ? (array)$_GET['search_by'] : ['username'];
+    $search_values = isset($_GET['search_value']) ? (array)($_GET['search_value'] ?? '') : [''];
+    $search_bys = isset($_GET['search_by']) ? (array)($_GET['search_by'] ?? '') : ['username'];
     $search_menu = ['username', 'id', 'SecurityLevel', 'greater_gmlevel', 'email', 'joindate', 'last_ip', 'country', 'failed_logins', 'greater_failed_logins', 'lesser_failed_logins', 'last_login', 'online', 'banned', 'locked', 'expansion', 'recruiter'];
 
     $where_clauses = [];
@@ -148,7 +148,7 @@ function browse_users(&$sqlr, &$sqlc)
             $where_clauses[] = '`account`.' . $field . ' LIKE "%' . $val . '%"';
     }
 
-    $has_chars = (isset($_GET['has_chars']) && $_GET['has_chars'] === '1');
+    $has_chars = (isset($_GET['has_chars']) && ($_GET['has_chars'] ?? '') === '1');
     if ($has_chars)
     {
         $search_url .= '&amp;has_chars=1';
@@ -366,7 +366,7 @@ function browse_users(&$sqlr, &$sqlc)
             }
             if ($user_lvl >= $action_permission['update']||($user_name === $data['username']))
                 $output .= '
-                                <td><a href="mailto:'.$data['email'].'" title="'.htmlspecialchars($data['email']).'">'.(strlen($data['email']) > 8 ? substr($data['email'],0,8).'..' : $data['email']).'</a></td>';
+                                <td>'.(!empty($data['email']) ? '<a href="mailto:'.htmlspecialchars($data['email']).'" title="'.htmlspecialchars($data['email']).'">'.(strlen($data['email']) > 8 ? htmlspecialchars(substr($data['email'],0,8)).'..' : htmlspecialchars($data['email'])).'</a>' : '-').'</td>';
             else
                 $output .= '
                                 <td>***@***.***</td>';
@@ -482,14 +482,14 @@ function del_user()
     valid_login($action_permission['delete']);
 
     if(isset($_GET['check']))
-        $check = array_values(array_filter(array_map('intval', (array)$_GET['check'])));
+        $check = array_values(array_filter(array_map('intval', (array)($_GET['check'] ?? []))));
     else
         redirect("user.php?error=1");
 
     $pass_array = "";
 
     //skip to backup
-    if (isset($_GET['backup_op'])&&($_GET['backup_op'] == 1))
+    if (isset($_GET['backup_op'])&&(($_GET['backup_op'] ?? '') == 1))
     {
         csrf_check();
         for ($i=0; $i<count($check); $i++)
@@ -551,7 +551,7 @@ function dodel_user()
     $sqlr->connect($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name']);
 
     if(isset($_GET['check']))
-        $check = array_values(array_filter(array_map('intval', (array)$_GET['check'])));
+        $check = array_values(array_filter(array_map('intval', (array)($_GET['check'] ?? []))));
     else
         redirect("user.php?error=1");
 
@@ -614,7 +614,7 @@ function backup_user()
     $sql->connect($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name']);
 
     if(isset($_GET['check']))
-        $check = array_values(array_filter(array_map('intval', (array)$_GET['check'])));
+        $check = array_values(array_filter(array_map('intval', (array)($_GET['check'] ?? []))));
     else
         redirect("user.php?error=1");
 
@@ -663,7 +663,7 @@ function backup_user()
                         for($j=0; $j<$num_fields; $j++)
                         {
                             $row[$j] = addslashes($row[$j]);
-                            $row[$j] = preg_replace("\n","\\n",$row[$j]);
+                            $row[$j] = preg_replace("/\n/","\\n",$row[$j] ?? '');
 
                             if (isset($row[$j]))
                             {
@@ -728,7 +728,7 @@ function backup_user()
                                 for($j=0; $j<$num_fields; $j++)
                                 {
                                     $row[$j] = addslashes($row[$j]);
-                                    $row[$j] = preg_replace("\n","\\n",$row[$j]);
+                                    $row[$j] = preg_replace("/\n/","\\n",$row[$j] ?? '');
 
                                     if (isset($row[$j]))
                                     {
@@ -860,7 +860,7 @@ function doadd_new()
     $sqlc = new SQL;
     $sqlc->connect($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name']);
 
-    $new_user = $sqlc->quote_smart(trim($_POST['new_user']));
+    $new_user = $sqlc->quote_smart(trim(($_POST['new_user'] ?? '')));
 
     //make sure username/pass at least 4 chars long and less than max
     if ((strlen($new_user) < 4) || (strlen($new_user) > 15))
@@ -877,11 +877,11 @@ function doadd_new()
     else
         $last_ip = "0.0.0.0";
     
-    list($salt,$verifier) = GetSRP6RegistrationData(trim($_POST['new_user']), $_POST['pass']);
+    list($salt,$verifier) = GetSRP6RegistrationData(trim(($_POST['new_user'] ?? '')), ($_POST['pass'] ?? ''));
 
-    $new_mail = (isset($_POST['new_mail'])) ? $sqlc->quote_smart(trim($_POST['new_mail'])) : NULL;
-    $locked = (isset($_POST['new_locked'])) ? (int)$sqlc->quote_smart($_POST['new_locked']) : 0;
-    $expansion = (isset($_POST['new_expansion'])) ? (int)$sqlc->quote_smart($_POST['new_expansion']) : 0;
+    $new_mail = (isset($_POST['new_mail'])) ? $sqlc->quote_smart(trim(($_POST['new_mail'] ?? ''))) : NULL;
+    $locked = (isset($_POST['new_locked'])) ? (int)$sqlc->quote_smart(($_POST['new_locked'] ?? '')) : 0;
+    $expansion = (isset($_POST['new_expansion'])) ? (int)$sqlc->quote_smart(($_POST['new_expansion'] ?? '')) : 0;
     $result = $sqlc->query("INSERT INTO account (username,salt,verifier,email, joindate,last_ip,failed_logins,locked,last_login,expansion)
                             VALUES ('$new_user',UNHEX('".bin2hex($salt)."'),UNHEX('".bin2hex($verifier)."'),'$new_mail',now() ,'$last_ip',0, $locked ,NULL, $expansion)");
     if ($result)
@@ -915,16 +915,20 @@ function edit_user()
     $r_target = isset($characters_db[$realm_id]) ? $realm_id : array_key_first($characters_db);
                 $sqlc->connect($characters_db[$r_target]['addr'], $characters_db[$r_target]['user'], $characters_db[$r_target]['pass'], $characters_db[$r_target]['name']);
 
-    $id = (int)$sqlr->quote_smart($_GET['id']);
+    $id = (int)$sqlr->quote_smart(($_GET['id'] ?? ''));
 
     $result = $sqlr->query("SELECT IFNULL(`account_access`.`SecurityLevel`,0) as `SecurityLevel`, `account`.* FROM account LEFT JOIN account_access ON account.id=account_access.AccountID WHERE account.id = '$id'");
     $data = $sqlr->fetch_assoc($result);
 
-    $refguid = $sqlm->fetch_assoc($sqlm->query('SELECT InvitedBy FROM mm_point_system_invites WHERE PlayersAccount = '.$data['id'].''));
-    $refguid = $refguid['InvitedBy'];
-    $referred_by = $sqlc->fetch_assoc($sqlc->query("SELECT BINARY name AS name FROM characters WHERE guid = '$refguid'"));
-    unset($refguid);
-    $referred_by = $referred_by['name'];
+    $ref_row = $sqlm->fetch_assoc($sqlm->query('SELECT InvitedBy FROM mm_point_system_invites WHERE PlayersAccount = '.intval($data['id'])));
+    $refguid = $ref_row['InvitedBy'] ?? null;
+    $referred_by = null;
+    if ($refguid)
+    {
+        $ref_char = $sqlc->fetch_assoc($sqlc->query("SELECT BINARY name AS name FROM characters WHERE guid = ".intval($refguid)));
+        $referred_by = $ref_char['name'] ?? null;
+    }
+    unset($ref_row, $refguid, $ref_char);
 
     if ($sqlr->num_rows($result))
     {
@@ -1307,35 +1311,35 @@ function doedit_user()
     valid_login($action_permission['update']);
     csrf_check();
 
-    if ( (!isset($_POST['pass'])||($_POST['pass'] === ''))
-            && (!isset($_POST['mail'])||($_POST['mail'] === ''))
-            && (!isset($_POST['expansion'])||($_POST['expansion'] === ''))
-            && (!isset($_POST['referredby'])||($_POST['referredby'] === '')) )
-        redirect("user.php?action=edit_user&&id={$_POST['id']}&error=1");
+    if ( (!isset($_POST['pass'])||(($_POST['pass'] ?? '') === ''))
+            && (!isset($_POST['mail'])||(($_POST['mail'] ?? '') === ''))
+            && (!isset($_POST['expansion'])||(($_POST['expansion'] ?? '') === ''))
+            && (!isset($_POST['referredby'])||(($_POST['referredby'] ?? '') === '')) )
+        redirect("user.php?action=edit_user&&id=".($_POST['id'] ?? '')."&error=1");
 
     $sqlr = new SQL;
     $sqlr->connect($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name']);
 
-    $id = $sqlr->quote_smart($_POST['id']);
-    $username = $sqlr->quote_smart($_POST['username']);
-    $banreason = $sqlr->quote_smart($_POST['banreason']);
+    $id = $sqlr->quote_smart(($_POST['id'] ?? ''));
+    $username = $sqlr->quote_smart(($_POST['username'] ?? ''));
+    $banreason = $sqlr->quote_smart(($_POST['banreason'] ?? ''));
     
     $user_pass_change = '';
-    if ($_POST['pass'] !== '')
+    if (($_POST['pass'] ?? '') !== '')
     {
         // the verifier is built from the raw name, as login.php checks it
-        list($salt, $verifier) = GetSRP6RegistrationData($_POST['username'], $_POST['pass']);
+        list($salt, $verifier) = GetSRP6RegistrationData(($_POST['username'] ?? ''), ($_POST['pass'] ?? ''));
         $user_pass_change = ('username=\'' . $username . '\', salt=UNHEX(\'' . bin2hex($salt) . '\'), verifier=UNHEX(\'' . bin2hex($verifier) . '\'), ');
     }
 
-    $mail = (isset($_POST['mail']) && $_POST['mail'] != '') ? $sqlr->quote_smart($_POST['mail']) : "";
-    $failed = (isset($_POST['failed'])) ? $sqlr->quote_smart($_POST['failed']) : 0;
-    $SecurityLevel = (isset($_POST['SecurityLevel'])) ? $sqlr->quote_smart($_POST['SecurityLevel']) : 0;
-    $expansion = (isset($_POST['expansion'])) ? $sqlr->quote_smart($_POST['expansion']) : 1;
-    $banned = (isset($_POST['banned'])) ? $sqlr->quote_smart($_POST['banned']) : 0;
-    $locked = (isset($_POST['locked'])) ? $sqlr->quote_smart($_POST['locked']) : 0;
-    $referredby = isset($_POST['referredby']) ? $sqlr->quote_smart(trim($_POST['referredby'])) : '';
-    $recruiter_raw = isset($_POST['recruiter']) ? trim($_POST['recruiter']) : '';
+    $mail = (isset($_POST['mail']) && ($_POST['mail'] ?? '') != '') ? $sqlr->quote_smart(($_POST['mail'] ?? '')) : "";
+    $failed = (isset($_POST['failed'])) ? $sqlr->quote_smart(($_POST['failed'] ?? '')) : 0;
+    $SecurityLevel = (isset($_POST['SecurityLevel'])) ? $sqlr->quote_smart(($_POST['SecurityLevel'] ?? '')) : 0;
+    $expansion = (isset($_POST['expansion'])) ? $sqlr->quote_smart(($_POST['expansion'] ?? '')) : 1;
+    $banned = (isset($_POST['banned'])) ? $sqlr->quote_smart(($_POST['banned'] ?? '')) : 0;
+    $locked = (isset($_POST['locked'])) ? $sqlr->quote_smart(($_POST['locked'] ?? '')) : 0;
+    $referredby = isset($_POST['referredby']) ? $sqlr->quote_smart(trim(($_POST['referredby'] ?? ''))) : '';
+    $recruiter_raw = isset($_POST['recruiter']) ? trim(($_POST['recruiter'] ?? '')) : '';
     $recruiter_id = 0;
     if ($recruiter_raw !== '' && $recruiter_raw !== '0')
     {
@@ -1356,20 +1360,20 @@ function doedit_user()
     $old_username = $sqlr->result($result, 0, 'username');
 
     // only a new username is validated, so existing names like "10#1" stay editable
-    if ($_POST['username'] !== $old_username)
+    if (($_POST['username'] ?? '') !== $old_username)
     {
         //make sure username/pass at least 4 chars long and less than max
-        if ((strlen($_POST['username']) < 4) || (strlen($_POST['username']) > 15))
+        if ((strlen(($_POST['username'] ?? '')) < 4) || (strlen(($_POST['username'] ?? '')) > 15))
             redirect("user.php?action=edit_user&id=$id&error=8");
-        if (!valid_alphabetic($_POST['username']))
+        if (!valid_alphabetic(($_POST['username'] ?? '')))
             redirect("user.php?action=edit_user&error=9&id=$id");
         // the SRP6 verifier includes the username, so a rename needs a new password
-        if ($_POST['pass'] === '')
+        if (($_POST['pass'] ?? '') === '')
             redirect("user.php?action=edit_user&error=17&id=$id");
     }
 
     if ($SecurityLevel >= $user_lvl)
-        redirect("user.php?action=edit_user&&id={$_POST['id']}&error=16");
+        redirect("user.php?action=edit_user&&id=".($_POST['id'] ?? '')."&error=16");
     //restricting accsess to lower gmlvl
     $accgmlevel = $sqlr->result($result, 0, 'SecurityLevel');
     if (($user_lvl <= $accgmlevel) && ($user_name != $old_username))
@@ -1418,26 +1422,27 @@ function doupdate_referral($referredby, $user_id)
     $sqlm->connect($mmfpm_db['addr'], $mmfpm_db['user'], $mmfpm_db['pass'], $mmfpm_db['name']);
     $sqlc = new SQL;
     $r_target = isset($characters_db[$realm_id]) ? $realm_id : array_key_first($characters_db);
-                $sqlc->connect($characters_db[$r_target]['addr'], $characters_db[$r_target]['user'], $characters_db[$r_target]['pass'], $characters_db[$r_target]['name']);
+    $sqlc->connect($characters_db[$r_target]['addr'], $characters_db[$r_target]['user'], $characters_db[$r_target]['pass'], $characters_db[$r_target]['name']);
     $sqlr = new SQL;
     $sqlr->connect($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name']);
 
-    $result = $sqlm->fetch_row($sqlm->query("SELECT InvitedBy FROM mm_point_system_invites WHERE PlayersAccount = '$user_id'"));
-    $result = $result[0];
+    $row = $sqlm->fetch_assoc($sqlm->query("SELECT InvitedBy FROM mm_point_system_invites WHERE PlayersAccount = " . intval($user_id)));
+    $result = $row['InvitedBy'] ?? null;
 
-    if ($result == NULL)
+    if ($result === null && !empty($referredby))
     {
-        $referred_by = $sqlc->fetch_row($sqlc->query("SELECT guid FROM characters WHERE BINARY name = '$referredby'"));
-        $referred_by = $referred_by[0];
+        $ref_row = $sqlc->fetch_assoc($sqlc->query("SELECT guid FROM characters WHERE BINARY name = '" . $sqlc->quote_smart($referredby) . "'"));
+        $referred_by = $ref_row['guid'] ?? null;
 
-        if ($referred_by != NULL)
+        if ($referred_by !== null)
         {
-            $char = $sqlc->fetch_row($sqlc->query("SELECT account FROM characters WHERE guid = '$referred_by'"));
-            $result = $sqlr->fetch_row($sqlr->query("SELECT id FROM account WHERE id = '$char'"));
-            $result = $result[0];
-            if ($result != $user_id)
+            $char_row = $sqlc->fetch_assoc($sqlc->query("SELECT account FROM characters WHERE guid = " . intval($referred_by)));
+            $char_acc = $char_row['account'] ?? 0;
+            $acc_row = $sqlr->fetch_assoc($sqlr->query("SELECT id FROM account WHERE id = " . intval($char_acc)));
+            $acc_id = $acc_row['id'] ?? null;
+            if ($acc_id && $acc_id != $user_id)
             {
-                $sqlm->query("INSERT INTO mm_point_system_invites (PlayersAccount, InvitedBy, InviterAccount) VALUES ('$user_id', '$referred_by', '$result')");
+                $sqlm->query("INSERT INTO mm_point_system_invites (PlayersAccount, InvitedBy, InviterAccount) VALUES (" . intval($user_id) . ", " . intval($referred_by) . ", " . intval($acc_id) . ")");
                 return true;
             }
             else
@@ -1462,9 +1467,9 @@ require_once 'scripts/config.php';
    if (!$enable_soap)
       return;
 
-   $cmd = $_GET['cmd'];
-   $char = $_GET['char'];
-   $id = $_GET['id'];
+   $cmd = ($_GET['cmd'] ?? '');
+   $char = ($_GET['char'] ?? '');
+   $id = ($_GET['id'] ?? '');
 
    // character names are letters only (any script)
    if (!preg_match('/^\p{L}+$/u', $char))
@@ -1507,7 +1512,7 @@ $command = "error";
 //########################################################################################################################
 // MAIN
 //########################################################################################################################
-$err = (isset($_GET['error'])) ? $_GET['error'] : NULL;
+$err = (isset($_GET['error'])) ? ($_GET['error'] ?? '') : NULL;
 
 $output .= "
         <div class=\"top\">";
@@ -1595,7 +1600,7 @@ unset($err);
 $output .= "
         </div>";
 
-$action = (isset($_GET['action'])) ? $_GET['action'] : NULL;
+$action = (isset($_GET['action'])) ? ($_GET['action'] ?? '') : NULL;
 
 switch ($action)
 {

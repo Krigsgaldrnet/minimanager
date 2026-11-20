@@ -77,10 +77,10 @@ function backup_step2()
         redirect("backup.php?error=1");
     else
     {
-        $backup_action   = addslashes($_GET['backup_action']);
-        $backup_from_to  = addslashes($_GET['backup_from_to']);
-        $struc_backup    = (isset($_GET['struc_backup'])) ? addslashes($_GET['struc_backup']) :  0;
-        $save_all_realms = (isset($_GET['save_all_realms'])) ? addslashes($_GET['save_all_realms']) : 0;
+        $backup_action   = addslashes(($_GET['backup_action'] ?? ''));
+        $backup_from_to  = addslashes(($_GET['backup_from_to'] ?? ''));
+        $struc_backup    = (isset($_GET['struc_backup'])) ? addslashes(($_GET['struc_backup'] ?? '')) :  0;
+        $save_all_realms = (isset($_GET['save_all_realms'])) ? addslashes(($_GET['save_all_realms'] ?? '')) : 0;
     }
 
     $upload_max_filesize=ini_get("upload_max_filesize");
@@ -245,16 +245,16 @@ function dobackup()
         redirect("backup.php?error=1");
     else
     {
-        $backup_action = addslashes($_GET['backup_action']);
-        $backup_from_to = addslashes($_GET['backup_from_to']);
+        $backup_action = addslashes(($_GET['backup_action'] ?? ''));
+        $backup_from_to = addslashes(($_GET['backup_from_to'] ?? ''));
     }
 
     if (("load" == $backup_action)&&("file" == $backup_from_to))
     {
-        if (!preg_match("/(\.(sql|qbquery))$/i",$_FILES["uploaded_file"]["name"]))
+        if (!preg_match("/(\.(sql|qbquery))$/i",($_FILES["uploaded_file"]["name"] ?? '')))
             error($lang_backup['upload_sql_file_only']);
 
-        $uploaded_filename=str_replace(" ","_",$_FILES["uploaded_file"]["name"]);
+        $uploaded_filename=str_replace(" ","_",($_FILES["uploaded_file"]["name"] ?? ''));
         $uploaded_filename=preg_replace("/[^_A-Za-z0-9-\.]/i",'',$uploaded_filename);
         $file_name_new = $uploaded_filename."_".date("m.d.y_H.i.s").".sql";
 
@@ -262,7 +262,7 @@ function dobackup()
         if (file_exists("$backup_dir/$file_name_new"))
         {
             require_once("libs/db_lib/sql_lib.php");
-            $use_db = addslashes($_POST['use_db']);
+            $use_db = addslashes(($_POST['use_db'] ?? ''));
 
             if ($use_db == $realm_db['name'])
                 $queries = run_sql_script($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name'], "$backup_dir/$file_name_new",true);
@@ -282,12 +282,12 @@ function dobackup()
         if (empty($_POST['selected_file_name']))
             redirect("backup.php?error=1");
         else
-            $file_name = addslashes($_POST['selected_file_name']);
+            $file_name = addslashes(($_POST['selected_file_name'] ?? ''));
 
         if (file_exists("$backup_dir/$file_name"))
         {
             require_once("libs/db_lib/sql_lib.php");
-            $use_db = addslashes($_POST['use_db']);
+            $use_db = addslashes(($_POST['use_db'] ?? ''));
 
             if ($use_db == $realm_db['name'])
                 $queries = run_sql_script($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name'], "$backup_dir/$file_name",false);
@@ -306,8 +306,8 @@ function dobackup()
     elseif (("save" == $backup_action)&&("file" == $backup_from_to))
     {
         //save and send to user
-        $struc_backup = addslashes($_GET['struc_backup']);
-        $save_all_realms = addslashes($_GET['save_all_realms']);
+        $struc_backup = addslashes(($_GET['struc_backup'] ?? ''));
+        $save_all_realms = addslashes(($_GET['save_all_realms'] ?? ''));
 
         if($save_all_realms)
             $temp_id = "all_realms";
@@ -372,8 +372,8 @@ function dobackup()
     elseif (("save" == $backup_action)&&("web" == $backup_from_to))
     {
         //save backup to web/backup folder
-        $struc_backup = addslashes($_GET['struc_backup']);
-        $save_all_realms = addslashes($_GET['save_all_realms']);
+        $struc_backup = addslashes(($_GET['struc_backup'] ?? ''));
+        $save_all_realms = addslashes(($_GET['save_all_realms'] ?? ''));
 
         $file_name_new = $realm_db['name']."_backup_".date("m.d.y_H.i.s").".sql";
         $fp = fopen("$backup_dir/$file_name_new", 'w') or die (error($lang_backup['file_write_err']));
@@ -429,8 +429,8 @@ function dobackup()
     {
         //save evry account in different file
 
-        $struc_backup = addslashes($_GET['struc_backup']);
-        $save_all_realms = addslashes($_GET['save_all_realms']);
+        $struc_backup = addslashes(($_GET['struc_backup'] ?? ''));
+        $save_all_realms = addslashes(($_GET['save_all_realms'] ?? ''));
 
         $sql = new SQL;
         $sql->connect($realm_db['addr'], $realm_db['user'], $realm_db['pass'], $realm_db['name']);
@@ -479,7 +479,7 @@ function dobackup()
                         for($j=0; $j<$num_fields; $j++)
                         {
                             $row[$j] = addslashes($row[$j]);
-                            $row[$j] = preg_replace("/\n/","\\n",$row[$j]);
+                            $row[$j] = preg_replace("/\n/","\\n",$row[$j] ?? '');
                             if (isset($row[$j]))
                             {
                                 if ($sql->field_type($j,$acc_query) == "int")
@@ -547,7 +547,7 @@ function dobackup()
                                 for($j=0; $j<$num_fields; $j++)
                                 {
                                     $row[$j] = addslashes($row[$j]);
-                                    $row[$j] = preg_replace("/\n/","\\n",$row[$j]);
+                                    $row[$j] = preg_replace("/\n/","\\n",$row[$j] ?? '');
 
                                     if (isset($row[$j]))
                                     {
@@ -590,9 +590,9 @@ function dobackup()
             redirect("backup.php?error=1");
         else
         {
-            $file_name = addslashes($_POST['selected_file_name']);
-            $file_dir = addslashes($_POST['file_dir']);
-            $use_db = addslashes($_POST['use_db']);
+            $file_name = addslashes(($_POST['selected_file_name'] ?? ''));
+            $file_dir = addslashes(($_POST['file_dir'] ?? ''));
+            $use_db = addslashes(($_POST['use_db'] ?? ''));
         }
 
         $file_tmp = "$backup_dir/accounts/$file_dir/".$file_name."_$use_db.sql";
@@ -625,7 +625,7 @@ function dobackup()
 //########################################################################################################################
 // MAIN
 //########################################################################################################################
-$err = (isset($_GET['error'])) ? $_GET['error'] : NULL;
+$err = (isset($_GET['error'])) ? ($_GET['error'] ?? '') : NULL;
 
 $output .= "
         <div class=\"top\">";
@@ -655,7 +655,7 @@ switch ($err)
 
     case 4:
         if(isset($_GET['tot']))
-            $total_queries = $_GET['tot'];
+            $total_queries = ($_GET['tot'] ?? '');
         else
             $total_queries = NULL;
 
@@ -692,7 +692,7 @@ switch ($err)
 }
 
 
-$action = (isset($_GET['action'])) ? $_GET['action'] : NULL;
+$action = (isset($_GET['action'])) ? ($_GET['action'] ?? '') : NULL;
 
 switch ($action)
 {
